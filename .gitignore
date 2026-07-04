@@ -1,3 +1,5 @@
 _corral
 _repos
+**/*.pem
+**/*.o
 ponylang-experiments

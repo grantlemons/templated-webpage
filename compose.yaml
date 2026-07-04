@@ -1,0 +1,14 @@
+services:
+  server:
+    build: .
+    ports:
+      - "8443:8443"
+    develop:
+      watch:
+        - action: rebuild
+          path: main.pony
+          initial_sync: true
+        - action: sync
+          path: pages
+          target: /src/main/pages
+          initial_sync: true
