@@ -6,7 +6,7 @@ services:
     develop:
       watch:
         - action: rebuild
-          path: main.pony
+          path: src
           initial_sync: true
         - action: sync
           path: pages
