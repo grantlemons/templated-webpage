@@ -1,0 +1,21 @@
+{
+  "packages": [],
+  "deps": [
+    {
+      "locator": "github.com/ponylang/lori.git",
+      "version": "0.16.1"
+    },
+    {
+      "locator": "github.com/ponylang/stallion.git",
+      "version": "0.8.0"
+    }
+  ],
+  "info": {
+    "description": "",
+    "homepage": "",
+    "license": "",
+    "documentation_url": "",
+    "version": "",
+    "name": ""
+  }
+}
