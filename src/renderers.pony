@@ -66,5 +66,29 @@ class RenderUntemplated
     match _file_content
       | let content: String => content
       else
+        _env.err.print("No content!")
         error
     end
+
+class RenderStyled
+  let body_path: String val
+  let style_path: String val
+  let _env: Env
+  let _renderer: RenderTemplated
+  var _body_renderer: RenderTemplated
+  var _style_renderer: RenderUntemplated
+
+  new create(body_path': String val, style_path': String val, env: Env) =>
+    body_path = body_path'
+    style_path = style_path'
+    _env = env
+    _renderer = RenderTemplated("pages/template.html", env)
+    _body_renderer = RenderTemplated(body_path, _env)
+    _style_renderer = RenderUntemplated(style_path, _env)
+
+  fun apply(body_values: TemplateValues): String val ? =>
+    let values = TemplateValues
+    values.unescaped("styles", _style_renderer()?)
+    values.unescaped("body", _body_renderer(body_values)?)
+    
+    _renderer(values)?

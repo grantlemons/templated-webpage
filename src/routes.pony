@@ -3,13 +3,13 @@ use "stallion"
 
 class HomePage is PageGet
   let _env: Env
-  let _renderer: RenderTemplated ref
+  let _renderer: RenderStyled
   var title: String val
   var message: String val
 
   new create(env: Env) =>
     _env = env
-    _renderer = RenderTemplated("pages/home.html", env)
+    _renderer = RenderStyled("pages/home.html", "pages/styles.css", env)
     title = "Home"
     message = "Hello, World!"
 
@@ -27,7 +27,7 @@ class HomePage is PageGet
 
 class SiteCss is PageGet
   let _env: Env
-  let _renderer: RenderUntemplated ref
+  let _renderer: RenderUntemplated
 
   new create(env: Env) =>
     _env = env
@@ -43,7 +43,7 @@ class SiteCss is PageGet
 
 class Favicon is PageGet
   let _env: Env
-  let _renderer: RenderUntemplated ref
+  let _renderer: RenderUntemplated
 
   new create(env: Env) =>
     _env = env
