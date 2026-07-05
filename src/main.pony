@@ -120,54 +120,23 @@ actor HelloServer is stallion.HTTPServerActor
     end
     responder.respond(response)
 
-class FileReader
-  let _out: OutStream
-  let _err: OutStream
-
-  new create(env: Env) =>
-    _out = env.out
-    _err = env.err
-
-  fun apply(path: FilePath): String val ? =>
-    match OpenFile(path)
-    | let file: File =>
-      var res: String iso = String()
-      while file.errno() is FileOK do
-        res = res + file.read_string(1024)
-      end
-      res.strip()
-      return res
-    else
-      _err.print("Error opening file '" + path.path + "'")
-      error
-    end
-
 class HomePage
   let _env: Env
-  let _file_auth: FileAuth
+  let _renderer: RenderTemplated ref
   var title: String val
   var message: String val
 
   new create(env: Env) =>
     _env = env
-    _file_auth = FileAuth(env.root)
+    _renderer = RenderTemplated.cooked("pages/home.html", env)
     title = "Home"
     message = "Hello, World!"
 
-  fun apply(): String val ? => render_get()?
+  fun ref apply(): String val ? => render_get()?
 
-  fun render_get(): String val ? =>
-
-    let template =
-      try
-        templates.HtmlTemplate.parse(FileReader(_env)(FilePath(_file_auth, "pages/home.html"))?)?
-      else
-        _env.err.print("Could not parse template")
-        error
-      end
-    
+  fun ref render_get(): String val ? =>
     let values = templates.TemplateValues
     values("title") = title
     values("message") = message
 
-    template.render(values)?
+    _renderer.apply(values)?
