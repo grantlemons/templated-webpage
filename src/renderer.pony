@@ -1,5 +1,5 @@
 use "files"
-use templates = "templates"
+use "templates"
 
 class FileReader
   let _out: OutStream
@@ -27,33 +27,44 @@ class RenderTemplated
   let path: String val
   let _env: Env
   let _file_auth: FileAuth
-  var _file_content: (templates.HtmlTemplate | None) = None
+  var _file_content: (HtmlTemplate | None) = None
 
   new create(path': String val, env: Env) =>
     path = path'
     _env = env
     _file_auth = FileAuth(env.root)
+    _file_content = try
+        HtmlTemplate.parse(FileReader(_env)(FilePath(_file_auth, path))?)?
+      else
+        _env.err.print("Could not parse template")
+      end
 
-  new cooked(path': String val, env: Env) =>
+  fun apply(values: TemplateValues): String val ? =>
+    match _file_content
+      | let content: HtmlTemplate => content.render(values)?
+      else
+        error
+    end
+
+class RenderUntemplated
+  let path: String val
+  let _env: Env
+  let _file_auth: FileAuth
+  var _file_content: (String val | None) = None
+
+  new create(path': String val, env: Env) =>
     path = path'
     _env = env
     _file_auth = FileAuth(env.root)
-    try
-      cook()?
-    end
-
-  fun ref cook(): None ? =>
     _file_content = try
-        templates.HtmlTemplate.parse(FileReader(_env)(FilePath(_file_auth, path))?)?
+        FileReader(_env)(FilePath(_file_auth, path))?
       else
-        _env.err.print("Could not parse template")
-        error
+        _env.err.print("Could not read file!")
       end
 
-  fun ref apply(values: templates.TemplateValues): String val ? =>
+  fun apply(): String val ? =>
     match _file_content
-      | let content: templates.HtmlTemplate => content.render(values)?
-      | None =>
-        cook()?
-        apply(values)?
+      | let content: String => content
+      else
+        error
     end

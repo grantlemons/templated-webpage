@@ -1,6 +1,5 @@
 use "files"
 use "ssl/net"
-use templates = "templates"
 use stallion = "stallion"
 use lori = "lori"
 
@@ -68,7 +67,8 @@ actor Listener is lori.TCPListenerActor
     _env.out.print("Server closed")
 
 actor HelloServer is stallion.HTTPServerActor
-  var _http: stallion.HTTPServer = stallion.HTTPServer.none()
+  var _https: stallion.HTTPServer = stallion.HTTPServer.none()
+  let _router: Router
   let _env: Env
 
   new create(
@@ -80,63 +80,12 @@ actor HelloServer is stallion.HTTPServerActor
   )
   =>
     _env = env
-    _http = stallion.HTTPServer.ssl(auth, ssl_ctx, fd, this, config)
+    _router = Router(env)
+    _https = stallion.HTTPServer.ssl(auth, ssl_ctx, fd, this, config)
 
-  fun ref _http_connection(): stallion.HTTPServer => _http
+  fun ref _http_connection(): stallion.HTTPServer => _https
   
-  fun path_request(request: stallion.Request val): (String val | None) ? =>
-    match (request.method, request.uri.path)
-      | (stallion.GET, "/") => HomePage(_env).render_get()?
-      else
-        None
-    end
-
-  fun ref on_request_complete(request: stallion.Request val,
-    responder: stallion.Responder)
-  =>
-    let response = try
-      match path_request(request)?
-        | let resp_body': String val =>
-          _env.out.print("OK: " + request.uri.path)
-          stallion.ResponseBuilder(stallion.StatusOK)
-            .add_header("Content-Type", "text/html")
-            .add_header("Content-Length", resp_body'.size().string())
-            .finish_headers()
-            .add_chunk(resp_body')
-            .build()
-        | None => 
-          _env.out.print("NotFound: " + request.uri.path)
-          stallion.ResponseBuilder(stallion.StatusNotFound)
-            .add_header("Content-Length", "0")
-            .finish_headers()
-            .build()
-      end
-    else
-      _env.err.print("InternalServerError: " + request.uri.path)
-      stallion.ResponseBuilder(stallion.StatusInternalServerError)
-        .add_header("Content-Length", "0")
-        .finish_headers()
-        .build()
-    end
-    responder.respond(response)
-
-class HomePage
-  let _env: Env
-  let _renderer: RenderTemplated ref
-  var title: String val
-  var message: String val
-
-  new create(env: Env) =>
-    _env = env
-    _renderer = RenderTemplated.cooked("pages/home.html", env)
-    title = "Home"
-    message = "Hello, World!"
-
-  fun ref apply(): String val ? => render_get()?
-
-  fun ref render_get(): String val ? =>
-    let values = templates.TemplateValues
-    values("title") = title
-    values("message") = message
-
-    _renderer.apply(values)?
+  fun ref on_request_complete(
+    request: stallion.Request val,
+    responder: stallion.Responder ref
+  ) => _router(request, responder)
