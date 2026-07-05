@@ -18,12 +18,12 @@ class HomePage is PageGet
     values("title") = title
     values("message") = message
 
-    let res = try
-        OkResponder(_renderer.apply(values)?)
+    let response = try
+        OkResponse(_renderer.apply(values)?)
       else
-        InternalServerErrorResponder
+        StatusResponse(StatusNotFound)
       end
-    res(responder)
+    response.respond(responder)
 
 class AnyPage is PageGet
   let _env: Env
@@ -34,12 +34,12 @@ class AnyPage is PageGet
     _renderer = RenderStyled("pages" + page, "pages/styles.css", env)
 
   fun get(responder: Responder ref) =>
-    let res = try
-        OkResponder(_renderer.apply(TemplateValues)?)
+    let response = try
+        OkResponse(_renderer.apply(TemplateValues)?)
       else
-        NotFoundResponder
+        StatusResponse(StatusNotFound)
       end
-    res(responder)
+    response.respond(responder)
 
 class SiteCss is PageGet
   let _env: Env
@@ -50,12 +50,12 @@ class SiteCss is PageGet
     _renderer = RenderUntemplated("pages/styles.css", env)
 
   fun get(responder: Responder ref) =>
-    let res = try
-        OkResponder(_renderer.apply()?, "text/css")
+    let response = try
+        OkResponse(_renderer.apply()?)
       else
-        NotFoundResponder
+        StatusResponse(StatusNotFound)
       end
-    res(responder)
+    response.respond(responder)
 
 class Favicon is PageGet
   let _env: Env
@@ -66,9 +66,9 @@ class Favicon is PageGet
     _renderer = RenderUntemplated("pages/favicon.ico", env)
 
   fun get(responder: Responder ref) =>
-    let res = try
-        OkResponder(_renderer.apply()?, "image/x-icon")
+    let response = try
+        OkResponse(_renderer.apply()?)
       else
-        NotFoundResponder
+        StatusResponse(StatusNotFound)
       end
-    res(responder)
+    response.respond(responder)

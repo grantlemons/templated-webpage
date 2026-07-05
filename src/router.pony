@@ -13,7 +13,7 @@ class DummyContext is Context
 // this is a trait because it will also apply Page
 trait PageGet is Page
   fun get(responder: Responder ref)
-  fun head(responder: Responder ref) => OkResponder.empty()(responder)
+  fun head(responder: Responder ref) => OkResponse.empty().respond(responder)
 interface PagePost is Page
   fun post(responder: Responder ref, context: Context ref!)
 interface PagePut is Page
@@ -45,7 +45,7 @@ class HttpsRedirectRouter is Router
       request.uri.fragment
     )
     _env.out.print("Redirecting from " + request.uri.string() + " to " + uri.string())
-    RedirectResponder(uri)(responder)
+    RedirectResponse(uri).respond(responder)
 
 type RouteMap is Map[String val, Page]
 class PageRouter is Router
@@ -70,7 +70,7 @@ class PageRouter is Router
     end
 
     match (request.method, page)
-      | (_, None) => NotFoundResponder(responder)
+      | (_, None) => StatusResponse(StatusNotFound).respond(responder)
       | (GET, let page': PageGet box) => page'.get(responder)
       | (HEAD, let page': PageGet box) => page'.head(responder)
       | (POST, let page': PagePost box) => page'.post(responder, _context)
@@ -80,5 +80,5 @@ class PageRouter is Router
       | (PATCH, let page': PagePatch box) => page'.patch(responder, _context)
     else
       _env.err.print("Unsupported HTTP method!")
-      NotFoundResponder(responder)
+      StatusResponse(StatusNotFound).respond(responder)
     end
