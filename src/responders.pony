@@ -1,3 +1,4 @@
+use "uri"
 use "stallion"
 
 class NotFoundResponder
@@ -17,6 +18,19 @@ class InternalServerErrorResponder
 
   new create() =>
     _response = ResponseBuilder(StatusInternalServerError)
+      .add_header("Content-Length", "0")
+      .finish_headers()
+      .build()
+
+  fun apply(responder: Responder ref) =>
+    responder.respond(_response)
+
+class RedirectResponder
+  let _response: Array[U8] val
+
+  new create(uri: URI val) =>
+    _response = ResponseBuilder(StatusMovedPermanently)
+      .add_header("Location", uri.string())
       .add_header("Content-Length", "0")
       .finish_headers()
       .build()

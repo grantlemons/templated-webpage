@@ -1,5 +1,6 @@
 use "files"
 use "ssl/net"
+use "uri"
 use stallion = "stallion"
 use lori = "lori"
 
@@ -15,7 +16,7 @@ actor Main
             .> set_cert(
               FilePath(file_auth, "assets/cert.pem"),
               FilePath(file_auth, "assets/key.pem"))?
-            .> set_client_verify(false)
+            .> set_client_verify(true)
             .> set_server_verify(false)
         end
       else
@@ -24,20 +25,21 @@ actor Main
       end
 
     let auth = lori.TCPListenAuth(env.root)
-    Listener(auth, "0.0.0.0", "8443", sslctx, env)
+    Listener(auth, "0.0.0.0", "80", None, env)
+    Listener(auth, "0.0.0.0", "443", sslctx, env)
 
 actor Listener is lori.TCPListenerActor
   var _tcp_listener: lori.TCPListener = lori.TCPListener.none()
   let _config: stallion.ServerConfig
   let _server_auth: lori.TCPServerAuth
-  let _ssl_ctx: SSLContext val
+  let _ssl_ctx: (SSLContext val | None)
   let _env: Env
 
   new create(
     auth: lori.TCPListenAuth,
     host: String,
     port: String,
-    ssl_ctx: SSLContext val,
+    ssl_ctx: (SSLContext val | None),
     env: Env
   )
   =>
@@ -50,7 +52,7 @@ actor Listener is lori.TCPListenerActor
   fun ref _listener(): lori.TCPListener => _tcp_listener
 
   fun ref _on_accept(fd: U32): lori.TCPConnectionActor =>
-    HelloServer(_server_auth, fd, _config, _ssl_ctx, _env)
+    Webserver(_server_auth, fd, _config, _ssl_ctx, _env)
 
   fun ref _on_listening() =>
     try
@@ -66,8 +68,8 @@ actor Listener is lori.TCPListenerActor
   fun ref _on_closed() =>
     _env.out.print("Server closed")
 
-actor HelloServer is stallion.HTTPServerActor
-  var _https: stallion.HTTPServer = stallion.HTTPServer.none()
+actor Webserver is stallion.HTTPServerActor
+  var _http: stallion.HTTPServer = stallion.HTTPServer.none()
   let _router: Router
   let _env: Env
 
@@ -75,17 +77,25 @@ actor HelloServer is stallion.HTTPServerActor
     auth: lori.TCPServerAuth,
     fd: U32,
     config: stallion.ServerConfig,
-    ssl_ctx: SSLContext val,
+    ssl_ctx: (SSLContext val | None),
     env: Env
   )
   =>
     _env = env
-    _router = Router(env)
-    _https = stallion.HTTPServer.ssl(auth, ssl_ctx, fd, this, config)
 
-  fun ref _http_connection(): stallion.HTTPServer => _https
+    let host_uri = URI("http", URIAuthority(None, config.host, try config.port.u16()? end), "", None, None)
+    _router = match ssl_ctx
+      | let _: SSLContext => PageRouter(env)
+      | None => HttpsRedirectRouter(env, host_uri)
+    end
+    _http = match ssl_ctx
+      | let ssl_ctx': SSLContext => stallion.HTTPServer.ssl(auth, ssl_ctx', fd, this, config)
+      | None => stallion.HTTPServer(auth, fd, this, config)
+    end
+
+  fun ref _http_connection(): stallion.HTTPServer => _http
   
   fun ref on_request_complete(
     request: stallion.Request val,
     responder: stallion.Responder ref
-  ) => _router(request, responder)
+  ) => _router.route(request, responder)
