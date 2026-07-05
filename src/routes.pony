@@ -25,6 +25,22 @@ class HomePage is PageGet
       end
     res(responder)
 
+class AnyPage is PageGet
+  let _env: Env
+  let _renderer: RenderStyled
+
+  new create(env: Env, page: String val) =>
+    _env = env
+    _renderer = RenderStyled("pages" + page, "pages/styles.css", env)
+
+  fun get(responder: Responder ref) =>
+    let res = try
+        OkResponder(_renderer.apply(TemplateValues)?)
+      else
+        NotFoundResponder
+      end
+    res(responder)
+
 class SiteCss is PageGet
   let _env: Env
   let _renderer: RenderUntemplated
