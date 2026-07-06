@@ -1,10 +1,32 @@
-<html>
+<!DOCTYPE html>
+<html lang="en-us">
 <head>
+<meta charset="utf-8">
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
 <style>
 {{ styles }}
 </style>
 </head>
 <body>
-{{ body }}
+<main>
+    <div>
+        <header>
+            <h1 id="title">{{ title }}</h1>
+            <br />
+            <code id="date">{{ date }}</code>
+        </header>
+        {{ body }}
+        <footer>
+            <hr />
+            <nav>
+                <a href="{{ prev }}">prev</a>
+                <h3><a href="https://github.com/grantlemons/webring-manager/blob/main/sitelist">Webring</a></h3>
+                <a href="{{ next }}">next</a>
+            </nav>
+        </footer>
+    </div>
+</main>
 </body>
 </html>

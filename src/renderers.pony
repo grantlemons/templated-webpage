@@ -26,12 +26,14 @@ class FileReader
 class RenderTemplated
   let path: String val
   let _env: Env
+  let _values: TemplateValues box
   let _file_auth: FileAuth
   var _file_content: (HtmlTemplate | None) = None
 
-  new create(path': String val, env: Env) =>
+  new create(path': String val, env: Env, values: TemplateValues box = TemplateValues) =>
     path = path'
     _env = env
+    _values = values
     _file_auth = FileAuth(env.root)
     _file_content = try
         HtmlTemplate.parse(FileReader(_env)(FilePath(_file_auth, path))?)?
@@ -75,10 +77,11 @@ class RenderStyled
   let style_path: String val
   let _env: Env
   let _renderer: RenderTemplated
-  var _body_renderer: RenderTemplated
-  var _style_renderer: RenderUntemplated
+  let _values: TemplateValues box
+  let _body_renderer: RenderTemplated
+  let _style_renderer: RenderUntemplated
 
-  new create(body_path': String val, style_path': String val, env: Env) =>
+  new create(body_path': String val, style_path': String val, env: Env, values': TemplateValues box = TemplateValues) =>
     body_path = body_path'
     style_path = style_path'
     _env = env
@@ -86,8 +89,13 @@ class RenderStyled
     _body_renderer = RenderTemplated(body_path, _env)
     _style_renderer = RenderUntemplated(style_path, _env)
 
+    let values = values'.scope()
+    values("prev") = "https://devmail.group/"
+    values("next") = "https://byronsharman.com/"
+    _values = values
+
   fun apply(body_values: TemplateValues): String val ? =>
-    let values = TemplateValues
+    let values = _values.scope()
     values.unescaped("styles", _style_renderer()?)
     values.unescaped("body", _body_renderer(body_values)?)
     

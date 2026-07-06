@@ -4,19 +4,23 @@ use "stallion"
 class HomePage is PageGet
   let _env: Env
   let _renderer: RenderStyled
-  var title: String val
-  var message: String val
+  let _values: TemplateValues box
+  let title: String val
+  let date: String val
 
-  new create(env: Env) =>
+  new create(env: Env, values': TemplateValues box = TemplateValues) =>
+    title = "Lorem Ipsum"
+    date = "2026-07-01"
     _env = env
-    _renderer = RenderStyled("pages/home.html", "pages/styles.css", env)
-    title = "Home"
-    message = "Hello, World!"
+
+    let values = values'.scope()
+    values("title") = title
+    values("date") = date
+    _values = values
+    _renderer = RenderStyled("pages/home.html", "pages/styles.css", env, values)
 
   fun get(responder: Responder ref) =>
-    let values = TemplateValues
-    values("title") = title
-    values("message") = message
+    let values = _values.scope()
 
     let response = try
         OkResponse(_renderer.apply(values)?)
@@ -31,7 +35,9 @@ class AnyPage is PageGet
 
   new create(env: Env, page: String val) =>
     _env = env
-    _renderer = RenderStyled("pages" + page, "pages/styles.css", env)
+    let values = TemplateValues
+    values("title") = page
+    _renderer = RenderStyled("pages" + page, "pages/styles.css", env, values)
 
   fun get(responder: Responder ref) =>
     let response = try
