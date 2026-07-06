@@ -1,6 +1,6 @@
 use "files"
 use "templates"
-use @pygmentize_file[I32](path: Pointer[U8] tag, output_path: Pointer[U8] tag)
+use @system[I32](command: Pointer[U8] tag)
 
 class FileReader
   let _out: OutStream
@@ -73,8 +73,8 @@ class RenderStyled
   let body_path: String val
   let style_path: String val
   let _env: Env
-  let _renderer: RenderTemplated
   let _values: TemplateValues box
+  let _renderer: RenderTemplated
   let _body_renderer: RenderTemplated
   let _style_renderer: RenderUntemplated
 
@@ -100,7 +100,7 @@ class RenderStyled
 
 class RenderCode
   let _path: FilePath val
-  var _output_path: FilePath val
+  let _output_path: FilePath val
   let _reader: FileReader ref
   let _env: Env
 
@@ -113,6 +113,7 @@ class RenderCode
   fun apply(): String val ? =>
     if not _path.exists() then error end
     if not _output_path.exists() then
-      if @pygmentize_file(_path.path.cstring(), _output_path.path.cstring()) != 0 then error end
+      let command = "pygmentize -f html -O style=solarized-light -o " + _output_path.path + " " + _path.path
+      if @system(command.cstring()) != 0 then error end
     end
     _reader(_output_path)?
