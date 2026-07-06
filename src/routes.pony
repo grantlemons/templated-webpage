@@ -1,3 +1,4 @@
+use "files"
 use "templates"
 use "stallion"
 
@@ -16,6 +17,7 @@ class HomePage is PageGet
     let values = values'.scope()
     values("title") = title
     values("date") = date
+    values.unescaped("snippet", try RenderCode(FilePath.create(FileAuth(env.root), "pages/pygmentize.c"), env)()? else "" end)
     _values = values
     _renderer = RenderStyled("pages/home.html", "pages/styles.css", env, values)
 

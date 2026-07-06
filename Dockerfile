@@ -9,7 +9,7 @@ RUN corral run -- ponyc -Dlibressl -b main src
 
 FROM alpine:latest AS runner
 
-RUN apk add --update libressl-dev libatomic
+RUN apk add --update libressl-dev libatomic py3-pygments
 
 RUN mkdir -p /app
 WORKDIR /app

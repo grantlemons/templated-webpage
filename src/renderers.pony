@@ -1,5 +1,6 @@
 use "files"
 use "templates"
+use @pygmentize_file[I32](path: Pointer[U8] tag, output_path: Pointer[U8] tag)
 
 class FileReader
   let _out: OutStream
@@ -27,16 +28,14 @@ class RenderTemplated
   let path: String val
   let _env: Env
   let _values: TemplateValues box
-  let _file_auth: FileAuth
   var _file_content: (HtmlTemplate | None) = None
 
   new create(path': String val, env: Env, values: TemplateValues box = TemplateValues) =>
     path = path'
     _env = env
     _values = values
-    _file_auth = FileAuth(env.root)
     _file_content = try
-        HtmlTemplate.parse(FileReader(_env)(FilePath(_file_auth, path))?)?
+        HtmlTemplate.parse(FileReader(_env)(FilePath(FileAuth(env.root), path))?)?
       else
         _env.err.print("Could not parse template")
       end
@@ -51,15 +50,13 @@ class RenderTemplated
 class RenderUntemplated
   let path: String val
   let _env: Env
-  let _file_auth: FileAuth
   var _file_content: (String val | None) = None
 
   new create(path': String val, env: Env) =>
     path = path'
     _env = env
-    _file_auth = FileAuth(env.root)
     _file_content = try
-        FileReader(_env)(FilePath(_file_auth, path))?
+        FileReader(_env)(FilePath(FileAuth(env.root), path))?
       else
         _env.err.print("Could not read file!")
       end
@@ -100,3 +97,22 @@ class RenderStyled
     values.unescaped("body", _body_renderer(body_values)?)
     
     _renderer(values)?
+
+class RenderCode
+  let _path: FilePath val
+  var _output_path: FilePath val
+  let _reader: FileReader ref
+  let _env: Env
+
+  new create(path: FilePath val, env: Env) =>
+    _path = path
+    _output_path = FilePath.create(FileAuth(env.root), path.path + ".html")
+    _reader = FileReader(env)
+    _env = env
+
+  fun apply(): String val ? =>
+    if not _path.exists() then error end
+    if not _output_path.exists() then
+      if @pygmentize_file(_path.path.cstring(), _output_path.path.cstring()) != 0 then error end
+    end
+    _reader(_output_path)?
