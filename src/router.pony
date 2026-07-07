@@ -3,6 +3,7 @@ use "collections"
 use "stallion"
 
 interface RequestHandler
+  fun tag name(): String val
   fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext)
 
 trait Route
@@ -33,6 +34,8 @@ class HttpsRedirectHandler is RequestHandler
     _env = env
     _host_uri = host_uri
 
+  fun tag name(): String val => "Https Redirect Handler"
+
   fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext) =>
     let uri: URI val = URI(
       "https",
@@ -59,6 +62,8 @@ class Router is RequestHandler
       .> insert("/", Page.home(env))
       .> insert("/styles", Page.styles(env))
       .> insert("/favicon.ico", Page.favicon(env))
+
+  fun tag name(): String val => "Router"
 
   fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext) =>
     let page: (Route box | None) = try

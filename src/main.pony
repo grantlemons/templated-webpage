@@ -63,9 +63,9 @@ actor Listener is lori.TCPListenerActor
   fun ref _on_listening() =>
     try
       (let host, let port) = _tcp_listener.local_address().name()?
-      _env.out.print("HTTP server listening on " + host + ":" + port)
+      _env.out.print("HTTP server listening on " + host + ":" + port + ", handled by: " + _handler.name())
     else
-      _env.out.print("HTTP server listening")
+      _env.out.print("HTTP server listening on " + _config.host + ":" + _config.port + ", handled by: " + _handler.name())
     end
 
   fun ref _on_listen_failure() =>
