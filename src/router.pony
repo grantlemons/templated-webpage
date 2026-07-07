@@ -13,8 +13,11 @@ class DummyContext is Context
 
 // this is a trait because it will also apply Route
 trait RouteGet is Route
-  fun get(responder: Responder ref)
-  fun head(responder: Responder ref) => OkResponse.empty().respond(responder)
+  fun get(responder: (Responder ref | None)): USize
+  fun head(responder: (Responder ref | None)): USize =>
+    let size = get(None)
+    OkResponse.empty_size(size).respond(responder)
+    size
 interface RoutePost is Route
   fun post(responder: Responder ref, context: Context ref!)
 interface RoutePut is Route
@@ -74,8 +77,12 @@ class Router is RequestHandler
 
     match (request.method, page)
       | (_, None) => StatusResponse(StatusNotFound).respond(responder)
-      | (GET, let route': RouteGet box) => route'.get(responder)
-      | (HEAD, let route': RouteGet box) => route'.head(responder)
+      | (GET, let route': RouteGet box) =>
+          route'.get(responder)
+          None
+      | (HEAD, let route': RouteGet box) =>
+          route'.head(responder)
+          None
       | (POST, let route': RoutePost box) => route'.post(responder, context)
       | (PUT, let route': RoutePut box) => route'.put(responder, context)
       | (DELETE, let route': RouteDelete box) => route'.delete(responder, context)

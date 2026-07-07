@@ -32,10 +32,12 @@ class Page is RouteGet
     _env = env
     _renderer = RawRenderer(env, "public/favicon.ico")
 
-  fun get(responder: Responder ref) =>
-    let response = try
-        OkResponse(_renderer.render()?)
-      else
-        StatusResponse(StatusNotFound)
-      end
-    response.respond(responder)
+  fun get(responder: (Responder ref | None)): USize =>
+    try
+      let body = _renderer.render()?
+      OkResponse(body).respond(responder)
+      body.size()
+    else
+      StatusResponse(StatusNotFound).respond(responder)
+      0
+    end

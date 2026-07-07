@@ -4,8 +4,10 @@ use "stallion"
 trait Response
   fun response(): Array[U8] val
   fun apply() => response()
-  fun respond(responder: Responder ref) =>
-    responder.respond(response())
+  fun respond(responder: (Responder ref | None)) =>
+    match responder
+    | let responder': Responder ref => responder'.respond(response())
+    end
 
 class RedirectResponse is Response
   let _response: Array[U8] val
@@ -39,6 +41,12 @@ class OkResponse is Response
       .add_header("Content-Length", body.size().string())
       .finish_headers()
       .add_chunk(body)
+      .build()
+
+  new empty_size(size: USize) =>
+    _response = ResponseBuilder(StatusOK)
+      .add_header("Content-Length", size.string())
+      .finish_headers()
       .build()
 
   new empty() =>
