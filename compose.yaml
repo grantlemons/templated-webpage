@@ -11,5 +11,5 @@ services:
           initial_sync: true
         - action: sync
           path: pages
-          target: /src/main/pages
+          target: /app/pages
           initial_sync: true

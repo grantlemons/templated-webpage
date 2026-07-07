@@ -109,11 +109,15 @@ class RenderCode
     _output_path = FilePath.create(FileAuth(env.root), path.path + ".html")
     _reader = FileReader(env)
     _env = env
+    try generate()? end
 
-  fun apply(): String val ? =>
+  fun generate(): None ? =>
     if not _path.exists() then error end
     if not _output_path.exists() then
       let command = "pygmentize -f html -O style=solarized-light -o " + _output_path.path + " " + _path.path
       if @system(command.cstring()) != 0 then error end
     end
+
+  fun apply(): String val ? =>
+    generate()?
     _reader(_output_path)?

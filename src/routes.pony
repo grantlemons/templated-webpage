@@ -14,10 +14,13 @@ class HomePage is PageGet
     date = "2026-07-01"
     _env = env
 
+    let code_renderer: RenderCode = RenderCode(FilePath.create(FileAuth(env.root), "pages/pygmentize.c"), env)
+    let rendered_code: String val = try code_renderer()? else "" end
+
     let values = values'.scope()
     values("title") = title
     values("date") = date
-    values.unescaped("snippet", try RenderCode(FilePath.create(FileAuth(env.root), "pages/pygmentize.c"), env)()? else "" end)
+    values.unescaped("snippet", rendered_code)
     _values = values
     _renderer = RenderStyled("pages/home.html", "pages/styles.css", env, values)
 
