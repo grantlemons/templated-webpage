@@ -1,36 +1,32 @@
 use "files"
+use "debug"
 use "templates"
 use "stallion"
 
 class Page is RouteGet
-  let _env: Env
   let _renderer: Renderer
 
-  new home(env: Env) =>
-    _env = env
+  new home(file_auth: FileAuth) =>
     let title = "Lorem Ipsum"
     let date = "2026-07-01"
-    let snippet = try CodeRenderer(env, "assets/pygmentize.c").render()? else "" end
+    let snippet = try CodeRenderer(file_auth, "assets/pygmentize.c").render()? else "" end
 
     let values = TemplateValues
     values("title") = title
     values("date") = date
     values.unescaped("snippet", snippet)
-    _renderer = StyledRenderer(env, "public/home.html", values)
+    _renderer = StyledRenderer(file_auth, "public/home.html", values)
 
-  new any(env: Env, title: String val) =>
-    _env = env
+  new any(file_auth: FileAuth, title: String val) =>
     let values = TemplateValues
     values("title") = title
-    _renderer = StyledRenderer(env, "public/" + title + ".html", values)
+    _renderer = StyledRenderer(file_auth, "public/" + title + ".html", values)
 
-  new styles(env: Env) =>
-    _env = env
-    _renderer = RawRenderer(env, "public/styles.css")
+  new styles(file_auth: FileAuth) =>
+    _renderer = RawRenderer(file_auth, "public/styles.css")
 
-  new favicon(env: Env) =>
-    _env = env
-    _renderer = RawRenderer(env, "public/favicon.ico")
+  new favicon(file_auth: FileAuth) =>
+    _renderer = RawRenderer(file_auth, "public/favicon.ico")
 
   fun get(responder: (Responder ref | None)): USize =>
     try

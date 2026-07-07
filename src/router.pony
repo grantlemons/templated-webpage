@@ -1,4 +1,6 @@
 use "uri"
+use "files"
+use "debug"
 use "collections"
 use "stallion"
 
@@ -30,11 +32,9 @@ interface RoutePatch is Route
   fun patch(responder: Responder ref, context: Context ref!)
 
 class HttpsRedirectHandler is RequestHandler
-  let _env: Env
   let _host_uri: URI val
 
-  new val create(env: Env, host_uri: URI val) =>
-    _env = env
+  new val create(host_uri: URI val) =>
     _host_uri = host_uri
 
   fun tag name(): String val => "Https Redirect Handler"
@@ -50,21 +50,19 @@ class HttpsRedirectHandler is RequestHandler
       request.uri.query,
       request.uri.fragment
     )
-    _env.out.print("Redirecting from " + request.uri.string() + " to " + uri.string())
+    Debug("Redirecting from " + request.uri.string() + " to " + uri.string())
     RedirectResponse(uri).respond(responder)
 
 type RouteMap is Map[String val, Route]
 class Router is RequestHandler
-  let _env: Env
   let _map: RouteMap
 
-  new val create(env: Env) =>
-    _env = env
+  new val create(file_auth: FileAuth) =>
     _map =
       RouteMap.create()
-      .> insert("/", Page.home(env))
-      .> insert("/styles", Page.styles(env))
-      .> insert("/favicon.ico", Page.favicon(env))
+      .> insert("/", Page.home(file_auth))
+      .> insert("/styles", Page.styles(file_auth))
+      .> insert("/favicon.ico", Page.favicon(file_auth))
 
   fun tag name(): String val => "Router"
 
@@ -89,6 +87,6 @@ class Router is RequestHandler
       | (OPTIONS, let route': RouteOptions box) => route'.options(responder)
       | (PATCH, let route': RoutePatch box) => route'.patch(responder, context)
     else
-      _env.err.print("Unsupported HTTP method!")
+      Debug("Unsupported HTTP method!")
       StatusResponse(StatusNotFound).respond(responder)
     end

@@ -1,4 +1,5 @@
 use "files"
+use "debug"
 use "templates"
 use @system[I32](command: Pointer[U8] tag)
 
@@ -6,12 +7,8 @@ interface Renderer
   fun ref load()
   fun render( values: TemplateValues box = TemplateValues): String val ?
 
-class FileReader
-  let _env: Env
-
-  new create(env: Env) => _env = env
-
-  fun read_path(path: FilePath val): String val ? =>
+primitive FileReader
+  fun read(path: FilePath val): String val ? =>
     match OpenFile(path)
     | let file: File =>
       var res: String iso = String()
@@ -21,28 +18,23 @@ class FileReader
       res.strip()
       return res
     else
-      _env.err.print("Error opening file '" + path.path + "'")
+      Debug("Error opening file '" + path.path + "'")
       error
     end
 
-  fun apply(path: String val): String val ? =>
-    read_path(FilePath(FileAuth(_env.root), path))?
-
 class TemplateRenderer is Renderer
-  let _env: Env
   let _path: String val
   let _values: TemplateValues box
   var _renderer: Renderer ref
 
   new create(
-    env: Env,
+    file_auth: FileAuth,
     path: String val,
     values: TemplateValues box = TemplateValues
   ) =>
-    _env = env
     _path = path
     _values = values
-    _renderer = RawRenderer(env, path)
+    _renderer = RawRenderer(file_auth, path)
 
   fun ref load() => _renderer.load()
   fun render(
@@ -52,55 +44,59 @@ class TemplateRenderer is Renderer
     try
       template.render(values)?
     else
-      _env.err.print("Unable to render templated file " + _path)
+      Debug("Unable to render templated file " + _path)
       error
     end
   fun apply(values: TemplateValues): String val ? => render(values)?
     
 
 class RawRenderer is Renderer
-  let _env: Env
+  let _file_auth: FileAuth
   let _path: String val
   var _file_content: (String val | None) = None
 
-  new create(env: Env, path: String val) =>
-    _env = env
+  new create(file_auth: FileAuth, path: String val) =>
+    _file_auth = file_auth
     _path = path
     load()
   
-  new unloaded(env: Env, path: String val) =>
-    _env = env
+  new unloaded(file_auth: FileAuth, path: String val) =>
+    _file_auth = file_auth
     _path = path
 
+  fun _read(path: String val): String val ? =>
+    FileReader.read(FilePath(_file_auth, path))?
+
   fun ref load() => 
-    _env.out.print("Opening " + _path)
-    try _file_content = FileReader(_env)(_path)? end
+    Debug("Rendering " + _path)
+    try _file_content = _read(_path)? end
+
   fun render(
     values: TemplateValues box = TemplateValues
   ): String val ? => match _file_content
       | let content: String val => content
-      | None => FileReader(_env)(_path)?
+      | None => _read(_path)?
     end
   fun apply(): String val ? => render()?
 
 class StyledRenderer is Renderer
-  let _env: Env
+  let _file_auth: FileAuth
   var _values: TemplateValues box
   var _template_renderer: TemplateRenderer ref
   var _body_renderer: Renderer ref
   var _style_renderer: Renderer ref
 
   new create(
-    env: Env,
+    file_auth: FileAuth,
     body_path: String val,
     values: TemplateValues box = TemplateValues,
     stylesheet_path: String val = "public/styles.css",
     template_path: String val = "assets/template.html"
   ) =>
-    _env = env
-    _template_renderer = TemplateRenderer(env, template_path)
-    _body_renderer = TemplateRenderer(env, body_path)
-    _style_renderer = RawRenderer(env, stylesheet_path)
+    _file_auth = file_auth
+    _template_renderer = TemplateRenderer(file_auth, template_path)
+    _body_renderer = TemplateRenderer(file_auth, body_path)
+    _style_renderer = RawRenderer(file_auth, stylesheet_path)
     _values = values
     _values = _prev_next_scope(consume values)
 
@@ -128,17 +124,17 @@ class StyledRenderer is Renderer
   ): String val ? => render(values)?
 
 class CodeRenderer is Renderer
-  let _env: Env
+  let _file_auth: FileAuth
   let _path: FilePath val
   let _output_path: FilePath val
   var _renderer: Renderer ref
 
-  new create(env: Env, path: String val) =>
-    _env = env
-    _path = FilePath.create(FileAuth(env.root), path)
+  new create(file_auth: FileAuth, path: String val) =>
+    _file_auth = file_auth
+    _path = FilePath.create(_file_auth, path)
 
-    _output_path = FilePath.create(FileAuth(env.root), path + ".html")
-    _renderer = RawRenderer.unloaded(env, _output_path.path)
+    _output_path = FilePath.create(_file_auth, path + ".html")
+    _renderer = RawRenderer.unloaded(_file_auth, _output_path.path)
     load()
 
   // TODO: behavior?

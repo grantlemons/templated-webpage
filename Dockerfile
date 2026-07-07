@@ -5,7 +5,7 @@ RUN apk add --update libressl-dev
 COPY *.json /src/main/
 RUN corral fetch
 COPY src /src/main/src
-RUN corral run -- ponyc -Dlibressl -b main src
+RUN corral run -- ponyc --debug -Dlibressl -b main src
 
 FROM alpine:latest AS runner
 

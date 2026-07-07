@@ -1,4 +1,6 @@
 use "files"
+use "signals"
+use "debug"
 use "ssl/net"
 use "uri"
 use stallion = "stallion"
@@ -7,7 +9,7 @@ use lori = "lori"
 actor Main
   new create(env: Env) =>
     let file_auth = FileAuth(env.root)
-    let sslctx =
+    let ssl_ctx =
       try
         recover val
           SSLContext
@@ -25,8 +27,20 @@ actor Main
       end
 
     let auth = lori.TCPListenAuth(env.root)
-    Listener(env, auth, "0.0.0.0", "80", None)
-    Listener(env, auth, "0.0.0.0", "443", sslctx)
+    let listeners: Array[Listener tag] val = [
+      Listener(env, auth, "0.0.0.0", "80", None)
+      Listener(env, auth, "0.0.0.0", "443", ssl_ctx)
+    ]
+
+    // dispose of listeners to allow the program to exit
+    SignalHandler(
+      object iso is SignalNotify
+        fun ref apply(count: U32 val): Bool val =>
+          for l in listeners.values() do l.dispose() end
+          false
+      end,
+      Sig.term()
+    )
 
 actor Listener is lori.TCPListenerActor
   let _env: Env
@@ -50,15 +64,15 @@ actor Listener is lori.TCPListenerActor
     _config = stallion.ServerConfig(host, port)
     let host_uri = URI("http", URIAuthority(None, _config.host, try _config.port.u16()? end), "", None, None)
     _handler = match ssl_ctx
-      | let _: SSLContext => Router(env)
-      | None => HttpsRedirectHandler(env, host_uri)
+      | let _: SSLContext => Router(FileAuth(env.root))
+      | None => HttpsRedirectHandler(host_uri)
     end
     _tcp_listener = lori.TCPListener(auth, host, port, this)
 
   fun ref _listener(): lori.TCPListener => _tcp_listener
 
   fun ref _on_accept(fd: U32): lori.TCPConnectionActor tag =>
-    Webserver(_env, _server_auth, fd, _config, _ssl_ctx, _handler)
+    Webserver(_handler, _server_auth, fd, _config, _ssl_ctx)
 
   fun ref _on_listening() =>
     try
@@ -69,29 +83,25 @@ actor Listener is lori.TCPListenerActor
     end
 
   fun ref _on_listen_failure() =>
-    _env.out.print("Failed to start server")
+    _env.err.print("Failed to start server")
 
   fun ref _on_closed() =>
     _env.out.print("Server closed")
 
 actor Webserver is stallion.HTTPServerActor
-  let _env: Env
-  var _http: stallion.HTTPServer = stallion.HTTPServer.none()
   let _handler: RequestHandler val
+  var _http: stallion.HTTPServer = stallion.HTTPServer.none()
 
   new create(
-    env: Env,
+    handler: RequestHandler val,
     auth: lori.TCPServerAuth,
     fd: U32,
     config: stallion.ServerConfig,
-    ssl_ctx: (SSLContext val | None),
-    handler: RequestHandler val
+    ssl_ctx: (SSLContext val | None)
   )
   =>
-    _env = env
-
-    let host_uri = URI("http", URIAuthority(None, config.host, try config.port.u16()? end), "", None, None)
     _handler = handler
+    let host_uri = URI("http", URIAuthority(None, config.host, try config.port.u16()? end), "", None, None)
     _http = match ssl_ctx
       | let ssl_ctx': SSLContext => stallion.HTTPServer.ssl(auth, ssl_ctx', fd, this, config)
       | None => stallion.HTTPServer(auth, fd, this, config)
