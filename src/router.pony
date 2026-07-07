@@ -3,7 +3,7 @@ use "collections"
 use "stallion"
 
 interface RequestHandler
-  fun ref handle(request: Request val, responder: Responder ref)
+  fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext)
 
 trait Route
 trait Context
@@ -29,11 +29,11 @@ class HttpsRedirectHandler is RequestHandler
   let _env: Env
   let _host_uri: URI val
 
-  new create(env: Env, host_uri: URI val) =>
+  new val create(env: Env, host_uri: URI val) =>
     _env = env
     _host_uri = host_uri
 
-  fun ref handle(request: Request val, responder: Responder ref) =>
+  fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext) =>
     let uri: URI val = URI(
       "https",
       match _host_uri.authority
@@ -50,19 +50,17 @@ class HttpsRedirectHandler is RequestHandler
 type RouteMap is Map[String val, Route]
 class Router is RequestHandler
   let _env: Env
-  let _context: Context ref!
   let _map: RouteMap
 
-  new create(env: Env, context: Context ref = DummyContext) =>
+  new val create(env: Env) =>
     _env = env
-    _context = context
     _map =
       RouteMap.create()
       .> insert("/", Page.home(env))
       .> insert("/styles", Page.styles(env))
       .> insert("/favicon.ico", Page.favicon(env))
 
-  fun ref handle(request: Request val, responder: Responder ref) =>
+  fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext) =>
     let page: (Route box | None) = try
       _map(request.uri.path)?
     else
@@ -73,11 +71,11 @@ class Router is RequestHandler
       | (_, None) => StatusResponse(StatusNotFound).respond(responder)
       | (GET, let route': RouteGet box) => route'.get(responder)
       | (HEAD, let route': RouteGet box) => route'.head(responder)
-      | (POST, let route': RoutePost box) => route'.post(responder, _context)
-      | (PUT, let route': RoutePut box) => route'.put(responder, _context)
-      | (DELETE, let route': RouteDelete box) => route'.delete(responder, _context)
+      | (POST, let route': RoutePost box) => route'.post(responder, context)
+      | (PUT, let route': RoutePut box) => route'.put(responder, context)
+      | (DELETE, let route': RouteDelete box) => route'.delete(responder, context)
       | (OPTIONS, let route': RouteOptions box) => route'.options(responder)
-      | (PATCH, let route': RoutePatch box) => route'.patch(responder, _context)
+      | (PATCH, let route': RoutePatch box) => route'.patch(responder, context)
     else
       _env.err.print("Unsupported HTTP method!")
       StatusResponse(StatusNotFound).respond(responder)

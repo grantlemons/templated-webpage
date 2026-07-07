@@ -25,41 +25,47 @@ actor Main
       end
 
     let auth = lori.TCPListenAuth(env.root)
-    Listener(auth, "0.0.0.0", "80", None, env)
-    Listener(auth, "0.0.0.0", "443", sslctx, env)
+    Listener(env, auth, "0.0.0.0", "80", None)
+    Listener(env, auth, "0.0.0.0", "443", sslctx)
 
 actor Listener is lori.TCPListenerActor
+  let _env: Env
   var _tcp_listener: lori.TCPListener = lori.TCPListener.none()
   let _config: stallion.ServerConfig
   let _server_auth: lori.TCPServerAuth
   let _ssl_ctx: (SSLContext val | None)
-  let _env: Env
+  let _handler: RequestHandler val
 
   new create(
+    env: Env,
     auth: lori.TCPListenAuth,
     host: String,
     port: String,
-    ssl_ctx: (SSLContext val | None),
-    env: Env
+    ssl_ctx: (SSLContext val | None)
   )
   =>
     _env = env
     _ssl_ctx = ssl_ctx
     _server_auth = lori.TCPServerAuth(auth)
     _config = stallion.ServerConfig(host, port)
+    let host_uri = URI("http", URIAuthority(None, _config.host, try _config.port.u16()? end), "", None, None)
+    _handler = match ssl_ctx
+      | let _: SSLContext => Router(env)
+      | None => HttpsRedirectHandler(env, host_uri)
+    end
     _tcp_listener = lori.TCPListener(auth, host, port, this)
 
   fun ref _listener(): lori.TCPListener => _tcp_listener
 
   fun ref _on_accept(fd: U32): lori.TCPConnectionActor tag =>
-    Webserver(_server_auth, fd, _config, _ssl_ctx, _env)
+    Webserver(_env, _server_auth, fd, _config, _ssl_ctx, _handler)
 
   fun ref _on_listening() =>
     try
       (let host, let port) = _tcp_listener.local_address().name()?
-      _env.out.print("HTTPS server listening on " + host + ":" + port)
+      _env.out.print("HTTP server listening on " + host + ":" + port)
     else
-      _env.out.print("HTTPS server listening")
+      _env.out.print("HTTP server listening")
     end
 
   fun ref _on_listen_failure() =>
@@ -69,25 +75,23 @@ actor Listener is lori.TCPListenerActor
     _env.out.print("Server closed")
 
 actor Webserver is stallion.HTTPServerActor
-  var _http: stallion.HTTPServer = stallion.HTTPServer.none()
-  let _handler: RequestHandler
   let _env: Env
+  var _http: stallion.HTTPServer = stallion.HTTPServer.none()
+  let _handler: RequestHandler val
 
   new create(
+    env: Env,
     auth: lori.TCPServerAuth,
     fd: U32,
     config: stallion.ServerConfig,
     ssl_ctx: (SSLContext val | None),
-    env: Env
+    handler: RequestHandler val
   )
   =>
     _env = env
 
     let host_uri = URI("http", URIAuthority(None, config.host, try config.port.u16()? end), "", None, None)
-    _handler = match ssl_ctx
-      | let _: SSLContext => Router(env)
-      | None => HttpsRedirectHandler(env, host_uri)
-    end
+    _handler = handler
     _http = match ssl_ctx
       | let ssl_ctx': SSLContext => stallion.HTTPServer.ssl(auth, ssl_ctx', fd, this, config)
       | None => stallion.HTTPServer(auth, fd, this, config)
