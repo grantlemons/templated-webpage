@@ -3,6 +3,7 @@ use "templates"
 use @system[I32](command: Pointer[U8] tag)
 
 interface Renderer
+  fun ref load()
   fun render( values: TemplateValues box = TemplateValues): String val ?
 
 class FileReader
@@ -11,7 +12,6 @@ class FileReader
   new create(env: Env) => _env = env
 
   fun read_path(path: FilePath val): String val ? =>
-    _env.out.print("Opening file " + path.path)
     match OpenFile(path)
     | let file: File =>
       var res: String iso = String()
@@ -29,9 +29,10 @@ class FileReader
     read_path(FilePath(FileAuth(_env.root), path))?
 
 class TemplateRenderer is Renderer
-  let _path: String val
   let _env: Env
+  let _path: String val
   let _values: TemplateValues box
+  var _renderer: Renderer ref
 
   new create(
     env: Env,
@@ -41,11 +42,13 @@ class TemplateRenderer is Renderer
     _env = env
     _path = path
     _values = values
+    _renderer = RawRenderer(env, path)
 
+  fun ref load() => _renderer.load()
   fun render(
     values: TemplateValues box = TemplateValues
   ): String val ? =>
-    let template = HtmlTemplate.parse(UntemplatedRenderer(_env, _path).render()?)?
+    let template = HtmlTemplate.parse(_renderer.render()?)?
     try
       template.render(values)?
     else
@@ -55,25 +58,37 @@ class TemplateRenderer is Renderer
   fun apply(values: TemplateValues): String val ? => render(values)?
     
 
-class UntemplatedRenderer is Renderer
-  let _path: String val
+class RawRenderer is Renderer
   let _env: Env
+  let _path: String val
+  var _file_content: (String val | None) = None
 
   new create(env: Env, path: String val) =>
     _env = env
     _path = path
+    load()
+  
+  new unloaded(env: Env, path: String val) =>
+    _env = env
+    _path = path
 
+  fun ref load() => 
+    _env.out.print("Opening " + _path)
+    try _file_content = FileReader(_env)(_path)? end
   fun render(
     values: TemplateValues box = TemplateValues
-  ): String val ? => FileReader(_env)(_path)?
+  ): String val ? => match _file_content
+      | let content: String val => content
+      | None => FileReader(_env)(_path)?
+    end
   fun apply(): String val ? => render()?
 
 class StyledRenderer is Renderer
   let _env: Env
   var _values: TemplateValues box
-  let _template_renderer: TemplateRenderer
-  let _body_renderer: Renderer
-  let _style_renderer: Renderer
+  var _template_renderer: TemplateRenderer ref
+  var _body_renderer: Renderer ref
+  var _style_renderer: Renderer ref
 
   new create(
     env: Env,
@@ -85,7 +100,7 @@ class StyledRenderer is Renderer
     _env = env
     _template_renderer = TemplateRenderer(env, template_path)
     _body_renderer = TemplateRenderer(env, body_path)
-    _style_renderer = UntemplatedRenderer(env, stylesheet_path)
+    _style_renderer = RawRenderer(env, stylesheet_path)
     _values = values
     _values = _prev_next_scope(consume values)
 
@@ -97,6 +112,10 @@ class StyledRenderer is Renderer
     values("next") = "https://byronsharman.com/"
     values
 
+  fun ref load() =>
+    _template_renderer.load()
+    _body_renderer.load()
+    _style_renderer.load()
   fun render(
     body_values: TemplateValues box = TemplateValues
   ): String val ? =>
@@ -112,12 +131,15 @@ class CodeRenderer is Renderer
   let _env: Env
   let _path: FilePath val
   let _output_path: FilePath val
+  var _renderer: Renderer ref
 
   new create(env: Env, path: String val) =>
     _env = env
     _path = FilePath.create(FileAuth(env.root), path)
+
     _output_path = FilePath.create(FileAuth(env.root), path + ".html")
-    try generate()? end
+    _renderer = RawRenderer.unloaded(env, _output_path.path)
+    load()
 
   // TODO: behavior?
   fun generate(): None ? =>
@@ -127,7 +149,11 @@ class CodeRenderer is Renderer
       if @system(command.cstring()) != 0 then error end
     end
 
+  fun ref load() =>
+    try
+      generate()?
+      _renderer.load()
+    end
   fun render(values: TemplateValues box = TemplateValues): String val ? =>
-    generate()? // ensure the file has not been deleted
-    FileReader(_env).read_path(_output_path)?
+    _renderer.render()?
   fun apply(): String val ? => render()?

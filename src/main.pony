@@ -51,7 +51,7 @@ actor Listener is lori.TCPListenerActor
 
   fun ref _listener(): lori.TCPListener => _tcp_listener
 
-  fun ref _on_accept(fd: U32): lori.TCPConnectionActor =>
+  fun ref _on_accept(fd: U32): lori.TCPConnectionActor tag =>
     Webserver(_server_auth, fd, _config, _ssl_ctx, _env)
 
   fun ref _on_listening() =>

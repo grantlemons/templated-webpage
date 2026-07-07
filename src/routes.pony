@@ -26,11 +26,11 @@ class Page is RouteGet
 
   new styles(env: Env) =>
     _env = env
-    _renderer = UntemplatedRenderer(env, "public/styles.css")
+    _renderer = RawRenderer(env, "public/styles.css")
 
   new favicon(env: Env) =>
     _env = env
-    _renderer = UntemplatedRenderer(env, "public/favicon.ico")
+    _renderer = RawRenderer(env, "public/favicon.ico")
 
   fun get(responder: Responder ref) =>
     let response = try
