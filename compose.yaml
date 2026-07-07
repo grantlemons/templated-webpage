@@ -10,6 +10,10 @@ services:
           path: src
           initial_sync: true
         - action: sync
-          path: pages
-          target: /app/pages
+          path: public
+          target: /app/public
+          initial_sync: true
+        - action: sync
+          path: assets
+          target: /app/assets
           initial_sync: true

@@ -2,15 +2,16 @@ use "files"
 use "templates"
 use @system[I32](command: Pointer[U8] tag)
 
+interface Renderer
+  fun render( values: TemplateValues box = TemplateValues): String val ?
+
 class FileReader
-  let _out: OutStream
-  let _err: OutStream
+  let _env: Env
 
-  new create(env: Env) =>
-    _out = env.out
-    _err = env.err
+  new create(env: Env) => _env = env
 
-  fun apply(path: FilePath): String val ? =>
+  fun read_path(path: FilePath val): String val ? =>
+    _env.out.print("Opening file " + path.path)
     match OpenFile(path)
     | let file: File =>
       var res: String iso = String()
@@ -20,97 +21,105 @@ class FileReader
       res.strip()
       return res
     else
-      _err.print("Error opening file '" + path.path + "'")
+      _env.err.print("Error opening file '" + path.path + "'")
       error
     end
 
-class RenderTemplated
-  let path: String val
+  fun apply(path: String val): String val ? =>
+    read_path(FilePath(FileAuth(_env.root), path))?
+
+class TemplateRenderer is Renderer
+  let _path: String val
   let _env: Env
   let _values: TemplateValues box
-  var _file_content: (HtmlTemplate | None) = None
 
-  new create(path': String val, env: Env, values: TemplateValues box = TemplateValues) =>
-    path = path'
+  new create(
+    env: Env,
+    path: String val,
+    values: TemplateValues box = TemplateValues
+  ) =>
     _env = env
+    _path = path
     _values = values
-    _file_content = try
-        HtmlTemplate.parse(FileReader(_env)(FilePath(FileAuth(env.root), path))?)?
-      else
-        _env.err.print("Could not parse template")
-      end
 
-  fun apply(values: TemplateValues): String val ? =>
-    match _file_content
-      | let content: HtmlTemplate => content.render(values)?
-      else
-        error
+  fun render(
+    values: TemplateValues box = TemplateValues
+  ): String val ? =>
+    let template = HtmlTemplate.parse(UntemplatedRenderer(_env, _path).render()?)?
+    try
+      template.render(values)?
+    else
+      _env.err.print("Unable to render templated file " + _path)
+      error
     end
+  fun apply(values: TemplateValues): String val ? => render(values)?
+    
 
-class RenderUntemplated
-  let path: String val
+class UntemplatedRenderer is Renderer
+  let _path: String val
   let _env: Env
-  var _file_content: (String val | None) = None
 
-  new create(path': String val, env: Env) =>
-    path = path'
+  new create(env: Env, path: String val) =>
     _env = env
-    _file_content = try
-        FileReader(_env)(FilePath(FileAuth(env.root), path))?
-      else
-        _env.err.print("Could not read file!")
-      end
+    _path = path
 
-  fun apply(): String val ? =>
-    match _file_content
-      | let content: String => content
-      else
-        _env.err.print("No content!")
-        error
-    end
+  fun render(
+    values: TemplateValues box = TemplateValues
+  ): String val ? => FileReader(_env)(_path)?
+  fun apply(): String val ? => render()?
 
-class RenderStyled
-  let body_path: String val
-  let style_path: String val
+class StyledRenderer is Renderer
   let _env: Env
-  let _values: TemplateValues box
-  let _renderer: RenderTemplated
-  let _body_renderer: RenderTemplated
-  let _style_renderer: RenderUntemplated
+  var _values: TemplateValues box
+  let _template_renderer: TemplateRenderer
+  let _body_renderer: Renderer
+  let _style_renderer: Renderer
 
-  new create(body_path': String val, style_path': String val, env: Env, values': TemplateValues box = TemplateValues) =>
-    body_path = body_path'
-    style_path = style_path'
+  new create(
+    env: Env,
+    body_path: String val,
+    values: TemplateValues box = TemplateValues,
+    stylesheet_path: String val = "public/styles.css",
+    template_path: String val = "assets/template.html"
+  ) =>
     _env = env
-    _renderer = RenderTemplated("pages/template.html", env)
-    _body_renderer = RenderTemplated(body_path, _env)
-    _style_renderer = RenderUntemplated(style_path, _env)
+    _template_renderer = TemplateRenderer(env, template_path)
+    _body_renderer = TemplateRenderer(env, body_path)
+    _style_renderer = UntemplatedRenderer(env, stylesheet_path)
+    _values = values
+    _values = _prev_next_scope(consume values)
 
+  fun _prev_next_scope(
+    values': TemplateValues box = TemplateValues
+  ): TemplateValues box =>
     let values = values'.scope()
     values("prev") = "https://devmail.group/"
     values("next") = "https://byronsharman.com/"
-    _values = values
+    values
 
-  fun apply(body_values: TemplateValues): String val ? =>
+  fun render(
+    body_values: TemplateValues box = TemplateValues
+  ): String val ? =>
     let values = _values.scope()
-    values.unescaped("styles", _style_renderer()?)
-    values.unescaped("body", _body_renderer(body_values)?)
-    
-    _renderer(values)?
+    values.unescaped("styles", _style_renderer.render()?)
+    values.unescaped("body", _body_renderer.render(body_values)?)
+    _template_renderer.render(values)?
+  fun apply(
+    values: TemplateValues box = TemplateValues
+  ): String val ? => render(values)?
 
-class RenderCode
+class CodeRenderer is Renderer
+  let _env: Env
   let _path: FilePath val
   let _output_path: FilePath val
-  let _reader: FileReader ref
-  let _env: Env
 
-  new create(path: FilePath val, env: Env) =>
-    _path = path
-    _output_path = FilePath.create(FileAuth(env.root), path.path + ".html")
-    _reader = FileReader(env)
+  new create(env: Env, path: String val) =>
     _env = env
+    _path = FilePath.create(FileAuth(env.root), path)
+    _output_path = FilePath.create(FileAuth(env.root), path + ".html")
     try generate()? end
 
+  // TODO: behavior?
   fun generate(): None ? =>
     if not _path.exists() then error end
     if not _output_path.exists() then
@@ -118,6 +127,7 @@ class RenderCode
       if @system(command.cstring()) != 0 then error end
     end
 
-  fun apply(): String val ? =>
-    generate()?
-    _reader(_output_path)?
+  fun render(values: TemplateValues box = TemplateValues): String val ? =>
+    generate()? // ensure the file has not been deleted
+    FileReader(_env).read_path(_output_path)?
+  fun apply(): String val ? => render()?

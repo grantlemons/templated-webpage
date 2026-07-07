@@ -70,7 +70,7 @@ actor Listener is lori.TCPListenerActor
 
 actor Webserver is stallion.HTTPServerActor
   var _http: stallion.HTTPServer = stallion.HTTPServer.none()
-  let _router: Router
+  let _handler: RequestHandler
   let _env: Env
 
   new create(
@@ -84,9 +84,9 @@ actor Webserver is stallion.HTTPServerActor
     _env = env
 
     let host_uri = URI("http", URIAuthority(None, config.host, try config.port.u16()? end), "", None, None)
-    _router = match ssl_ctx
-      | let _: SSLContext => PageRouter(env)
-      | None => HttpsRedirectRouter(env, host_uri)
+    _handler = match ssl_ctx
+      | let _: SSLContext => Router(env)
+      | None => HttpsRedirectHandler(env, host_uri)
     end
     _http = match ssl_ctx
       | let ssl_ctx': SSLContext => stallion.HTTPServer.ssl(auth, ssl_ctx', fd, this, config)
@@ -98,4 +98,4 @@ actor Webserver is stallion.HTTPServerActor
   fun ref on_request_complete(
     request: stallion.Request val,
     responder: stallion.Responder ref
-  ) => _router.route(request, responder)
+  ) => _handler.handle(request, responder)

@@ -2,30 +2,30 @@ use "uri"
 use "collections"
 use "stallion"
 
-interface Router
-  fun ref route(request: Request val, responder: Responder ref)
+interface RequestHandler
+  fun ref handle(request: Request val, responder: Responder ref)
 
-trait Page
+trait Route
 trait Context
 
 class DummyContext is Context
 
-// this is a trait because it will also apply Page
-trait PageGet is Page
+// this is a trait because it will also apply Route
+trait RouteGet is Route
   fun get(responder: Responder ref)
   fun head(responder: Responder ref) => OkResponse.empty().respond(responder)
-interface PagePost is Page
+interface RoutePost is Route
   fun post(responder: Responder ref, context: Context ref!)
-interface PagePut is Page
+interface RoutePut is Route
   fun put(responder: Responder ref, context: Context ref!)
-interface PageDelete is Page
+interface RouteDelete is Route
   fun delete(responder: Responder ref, context: Context ref!)
-interface PageOptions is Page
+interface RouteOptions is Route
   fun options(responder: Responder ref)
-interface PagePatch is Page
+interface RoutePatch is Route
   fun patch(responder: Responder ref, context: Context ref!)
 
-class HttpsRedirectRouter is Router
+class HttpsRedirectHandler is RequestHandler
   let _env: Env
   let _host_uri: URI val
 
@@ -33,7 +33,7 @@ class HttpsRedirectRouter is Router
     _env = env
     _host_uri = host_uri
 
-  fun ref route(request: Request val, responder: Responder ref) =>
+  fun ref handle(request: Request val, responder: Responder ref) =>
     let uri: URI val = URI(
       "https",
       match _host_uri.authority
@@ -47,8 +47,8 @@ class HttpsRedirectRouter is Router
     _env.out.print("Redirecting from " + request.uri.string() + " to " + uri.string())
     RedirectResponse(uri).respond(responder)
 
-type RouteMap is Map[String val, Page]
-class PageRouter is Router
+type RouteMap is Map[String val, Route]
+class Router is RequestHandler
   let _env: Env
   let _context: Context ref!
   let _map: RouteMap
@@ -58,12 +58,12 @@ class PageRouter is Router
     _context = context
     _map =
       RouteMap.create()
-      .> insert("/", HomePage.create(env))
-      .> insert("/styles", SiteCss.create(env))
-      .> insert("/favicon.ico", Favicon.create(env))
+      .> insert("/", Page.home(env))
+      .> insert("/styles", Page.styles(env))
+      .> insert("/favicon.ico", Page.favicon(env))
 
-  fun ref route(request: Request val, responder: Responder ref) =>
-    let page: (Page box | None) = try
+  fun ref handle(request: Request val, responder: Responder ref) =>
+    let page: (Route box | None) = try
       _map(request.uri.path)?
     else
       None
@@ -71,13 +71,13 @@ class PageRouter is Router
 
     match (request.method, page)
       | (_, None) => StatusResponse(StatusNotFound).respond(responder)
-      | (GET, let page': PageGet box) => page'.get(responder)
-      | (HEAD, let page': PageGet box) => page'.head(responder)
-      | (POST, let page': PagePost box) => page'.post(responder, _context)
-      | (PUT, let page': PagePut box) => page'.put(responder, _context)
-      | (DELETE, let page': PageDelete box) => page'.delete(responder, _context)
-      | (OPTIONS, let page': PageOptions box) => page'.options(responder)
-      | (PATCH, let page': PagePatch box) => page'.patch(responder, _context)
+      | (GET, let route': RouteGet box) => route'.get(responder)
+      | (HEAD, let route': RouteGet box) => route'.head(responder)
+      | (POST, let route': RoutePost box) => route'.post(responder, _context)
+      | (PUT, let route': RoutePut box) => route'.put(responder, _context)
+      | (DELETE, let route': RouteDelete box) => route'.delete(responder, _context)
+      | (OPTIONS, let route': RouteOptions box) => route'.options(responder)
+      | (PATCH, let route': RoutePatch box) => route'.patch(responder, _context)
     else
       _env.err.print("Unsupported HTTP method!")
       StatusResponse(StatusNotFound).respond(responder)

@@ -2,83 +2,39 @@ use "files"
 use "templates"
 use "stallion"
 
-class HomePage is PageGet
+class Page is RouteGet
   let _env: Env
-  let _renderer: RenderStyled
-  let _values: TemplateValues box
-  let title: String val
-  let date: String val
+  let _renderer: Renderer
 
-  new create(env: Env, values': TemplateValues box = TemplateValues) =>
-    title = "Lorem Ipsum"
-    date = "2026-07-01"
+  new home(env: Env) =>
     _env = env
+    let title = "Lorem Ipsum"
+    let date = "2026-07-01"
+    let snippet = try CodeRenderer(env, "assets/pygmentize.c").render()? else "" end
 
-    let code_renderer: RenderCode = RenderCode(FilePath.create(FileAuth(env.root), "pages/pygmentize.c"), env)
-    let rendered_code: String val = try code_renderer()? else "" end
-
-    let values = values'.scope()
+    let values = TemplateValues
     values("title") = title
     values("date") = date
-    values.unescaped("snippet", rendered_code)
-    _values = values
-    _renderer = RenderStyled("pages/home.html", "pages/styles.css", env, values)
+    values.unescaped("snippet", snippet)
+    _renderer = StyledRenderer(env, "public/home.html", values)
 
-  fun get(responder: Responder ref) =>
-    let values = _values.scope()
-
-    let response = try
-        OkResponse(_renderer.apply(values)?)
-      else
-        StatusResponse(StatusNotFound)
-      end
-    response.respond(responder)
-
-class AnyPage is PageGet
-  let _env: Env
-  let _renderer: RenderStyled
-
-  new create(env: Env, page: String val) =>
+  new any(env: Env, title: String val) =>
     _env = env
     let values = TemplateValues
-    values("title") = page
-    _renderer = RenderStyled("pages" + page, "pages/styles.css", env, values)
+    values("title") = title
+    _renderer = StyledRenderer(env, "public/" + title + ".html", values)
 
-  fun get(responder: Responder ref) =>
-    let response = try
-        OkResponse(_renderer.apply(TemplateValues)?)
-      else
-        StatusResponse(StatusNotFound)
-      end
-    response.respond(responder)
-
-class SiteCss is PageGet
-  let _env: Env
-  let _renderer: RenderUntemplated
-
-  new create(env: Env) =>
+  new styles(env: Env) =>
     _env = env
-    _renderer = RenderUntemplated("pages/styles.css", env)
+    _renderer = UntemplatedRenderer(env, "public/styles.css")
 
-  fun get(responder: Responder ref) =>
-    let response = try
-        OkResponse(_renderer.apply()?)
-      else
-        StatusResponse(StatusNotFound)
-      end
-    response.respond(responder)
-
-class Favicon is PageGet
-  let _env: Env
-  let _renderer: RenderUntemplated
-
-  new create(env: Env) =>
+  new favicon(env: Env) =>
     _env = env
-    _renderer = RenderUntemplated("pages/favicon.ico", env)
+    _renderer = UntemplatedRenderer(env, "public/favicon.ico")
 
   fun get(responder: Responder ref) =>
     let response = try
-        OkResponse(_renderer.apply()?)
+        OkResponse(_renderer.render()?)
       else
         StatusResponse(StatusNotFound)
       end

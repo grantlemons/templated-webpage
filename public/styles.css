@@ -84,16 +84,11 @@ main > div {
 	padding: 1em;
 }
 
-code.snippet {
-	padding: 1em;
-	background: #f4ede8;
-	border-radius: 0.25em;
-}
-
 div.highlight {
 	background: #f4ede8;
 	overflow: auto;
 }
+
 blockquote {
 	padding: 1em;
 	background: #f4ede8;
