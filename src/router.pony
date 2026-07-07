@@ -1,57 +1,26 @@
-use "uri"
 use "files"
 use "debug"
 use "collections"
 use "stallion"
 
-interface RequestHandler
-  fun tag name(): String val
-  fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext)
+type Route is (RouteGet | RoutePost | RoutePut | RouteDelete | RouteOptions | RoutePatch)
 
-trait Route
-trait Context
-
-class DummyContext is Context
-
-// this is a trait because it will also apply Route
-trait RouteGet is Route
+interface RouteGet
   fun get(responder: (Responder ref | None)): USize
   fun head(responder: (Responder ref | None)): USize =>
     let size = get(None)
     OkResponse.empty_size(size).respond(responder)
     size
-interface RoutePost is Route
+interface RoutePost
   fun post(responder: Responder ref, context: Context ref!)
-interface RoutePut is Route
+interface RoutePut
   fun put(responder: Responder ref, context: Context ref!)
-interface RouteDelete is Route
+interface RouteDelete
   fun delete(responder: Responder ref, context: Context ref!)
-interface RouteOptions is Route
+interface RouteOptions
   fun options(responder: Responder ref)
-interface RoutePatch is Route
+interface RoutePatch
   fun patch(responder: Responder ref, context: Context ref!)
-
-class HttpsRedirectHandler is RequestHandler
-  let _host_uri: URI val
-
-  new val create(host_uri: URI val) =>
-    _host_uri = host_uri
-
-  fun tag name(): String val => "Https Redirect Handler"
-
-  fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext) =>
-    let uri: URI val = URI(
-      "https",
-      match _host_uri.authority
-        | let auth: URIAuthority if auth.host != "0.0.0.0" => URIAuthority(None, auth.host, None)
-      else URIAuthority(None, "localhost", None)
-      end,
-      request.uri.path,
-      request.uri.query,
-      request.uri.fragment
-    )
-    Debug("Redirecting from " + request.uri.string() + " to " + uri.string())
-    RedirectResponse(uri).respond(responder)
 
 type RouteMap is Map[String val, Route]
 class Router is RequestHandler
