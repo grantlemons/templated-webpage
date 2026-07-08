@@ -5,6 +5,8 @@ use "stallion"
 
 class Page is RouteGet
   let _renderer: Renderer
+  var _response: Response val = StatusResponse(StatusNotFound)
+  var _size: USize = 0
 
   new home(file_auth: FileAuth) =>
     let title = "Lorem Ipsum"
@@ -16,24 +18,27 @@ class Page is RouteGet
     values("date") = date
     values.unescaped("snippet", snippet)
     _renderer = StyledRenderer(file_auth, "public/home.html", values)
+    try bake_response()? end
 
   new any(file_auth: FileAuth, title: String val) =>
     let values = TemplateValues
     values("title") = title
     _renderer = StyledRenderer(file_auth, "public/" + title + ".html", values)
+    try bake_response()? end
 
   new styles(file_auth: FileAuth) =>
     _renderer = RawRenderer(file_auth, "public/styles.css")
+    try bake_response()? end
 
   new favicon(file_auth: FileAuth) =>
     _renderer = RawRenderer(file_auth, "public/favicon.ico")
+    try bake_response()? end
+
+  fun ref bake_response(): None ? =>
+    let body = _renderer.render()?
+    _response = OkResponse(body)
+    _size = body.size()
 
   fun get(responder: (Responder ref | None)): USize =>
-    try
-      let body = _renderer.render()?
-      OkResponse(body).respond(responder)
-      body.size()
-    else
-      StatusResponse(StatusNotFound).respond(responder)
-      0
-    end
+    _response.respond(responder)
+    _size
