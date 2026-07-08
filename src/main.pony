@@ -71,7 +71,20 @@ actor Listener is lori.TCPListenerActor
       | None => Router(FileAuth(env.root))
       // | None => HttpsRedirectHandler(host_uri)
     end
-    _tcp_listener = lori.TCPListener(auth, host, port, this)
+    let max_spawn =
+      match lori.MakeMaxSpawn(4000)
+        | let max: lori.MaxSpawn => max
+      else
+        lori.DefaultMaxSpawn()
+      end
+    _tcp_listener = lori.TCPListener(
+      auth,
+      host,
+      port,
+      this,
+      lori.DualStack,
+      max_spawn
+    )
 
   fun ref _listener(): lori.TCPListener => _tcp_listener
 

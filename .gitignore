@@ -3,3 +3,4 @@ _repos
 **/*.pem
 **/*.o
 ponylang-experiments
+main
