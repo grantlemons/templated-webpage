@@ -5,7 +5,7 @@ RUN apk add --update libressl-dev
 COPY *.json /src/main/
 RUN corral fetch
 COPY src /src/main/src
-RUN corral run -- ponyc --debug -Dlibressl -b main src
+RUN corral run -- ponyc -Dlibressl -b main src
 
 FROM alpine:latest AS runner
 
@@ -17,5 +17,6 @@ COPY assets /app/assets
 COPY public /app/public
 COPY --from=builder /src/main/main /app/main
 
-EXPOSE 8443
+EXPOSE 80
+EXPOSE 443
 ENTRYPOINT ["/app/main"]

@@ -6,6 +6,9 @@ use "uri"
 use stallion = "stallion"
 use lori = "lori"
 
+interface Disposable
+  fun tag dispose(): None val
+
 actor Main
   new create(env: Env) =>
     let file_auth = FileAuth(env.root)
@@ -27,7 +30,7 @@ actor Main
       end
 
     let auth = lori.TCPListenAuth(env.root)
-    let listeners: Array[Listener tag] val = [
+    let trash: Array[Disposable tag] val = [
       Listener(env, auth, "0.0.0.0", "80", None)
       Listener(env, auth, "0.0.0.0", "443", ssl_ctx)
     ]
@@ -36,7 +39,7 @@ actor Main
     SignalHandler(
       object iso is SignalNotify
         fun ref apply(count: U32 val): Bool val =>
-          for l in listeners.values() do l.dispose() end
+          for t in trash.values() do t.dispose() end
           false
       end,
       Sig.term()
@@ -65,7 +68,8 @@ actor Listener is lori.TCPListenerActor
     let host_uri = URI("http", URIAuthority(None, _config.host, try _config.port.u16()? end), "", None, None)
     _handler = match ssl_ctx
       | let _: SSLContext => Router(FileAuth(env.root))
-      | None => HttpsRedirectHandler(host_uri)
+      | None => Router(FileAuth(env.root))
+      // | None => HttpsRedirectHandler(host_uri)
     end
     _tcp_listener = lori.TCPListener(auth, host, port, this)
 

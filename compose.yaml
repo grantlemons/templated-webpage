@@ -9,11 +9,11 @@ services:
         - action: rebuild
           path: src
           initial_sync: true
-        - action: sync
+        - action: sync+restart
           path: public
           target: /app/public
           initial_sync: true
-        - action: sync
+        - action: sync+restart
           path: assets
           target: /app/assets
           initial_sync: true
