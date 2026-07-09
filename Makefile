@@ -3,8 +3,10 @@ COMPILERFLAGS=-Dopenssl_3.0.x
 SRCS=src
 TARGET=main
 
+# change the order of debug and release to change the default
 debug: COMPILERFLAGS+=--debug
 debug: release
+release: _corral _repos $(TARGET)
 
 $(TARGET): $(SRCS)
 	$(COMPILER) $(COMPILERFLAGS) $^ -b $@
@@ -15,8 +17,6 @@ _corral:
 	corral fetch
 _repos:
 	corral fetch
-
-release: _corral _repos $(TARGET)
 
 .PHONY: clean all debug release
 clean:
