@@ -9,10 +9,10 @@ trait Response
     | let responder': Responder ref => responder'.respond(response())
     end
 
-class RedirectResponse is Response
+class val RedirectResponse is Response
   let _response: Array[U8] val
 
-  new create(uri: URI val) =>
+  new val create(uri: URI val) =>
     _response = ResponseBuilder(StatusMovedPermanently)
       .add_header("Location", uri.string())
       .add_header("Content-Length", "0")
@@ -21,10 +21,10 @@ class RedirectResponse is Response
 
   fun response(): Array[U8] val => _response
 
-class StatusResponse is Response
+class val StatusResponse is Response
   let _response: Array[U8] val
 
-  new create(status: Status val) =>
+  new val create(status: Status val) =>
     _response = ResponseBuilder(status)
       .add_header("Content-Length", "0")
       .finish_headers()
@@ -32,10 +32,10 @@ class StatusResponse is Response
 
   fun response(): Array[U8] val => _response
 
-class OkResponse is Response
+class val OkResponse is Response
   let _response: Array[U8] val
 
-  new create(body: String val, content_type: String val = "text/html") =>
+  new val create(body: String val, content_type: String val = "text/html") =>
     _response = ResponseBuilder(StatusOK)
       .add_header("Content-Type", content_type)
       .add_header("Content-Length", body.size().string())
@@ -43,13 +43,13 @@ class OkResponse is Response
       .add_chunk(body)
       .build()
 
-  new empty_size(size: USize) =>
+  new val empty_size(size: USize) =>
     _response = ResponseBuilder(StatusOK)
       .add_header("Content-Length", size.string())
       .finish_headers()
       .build()
 
-  new empty() =>
+  new val empty() =>
     _response = ResponseBuilder(StatusOK)
       .add_header("Content-Length", "0")
       .finish_headers()

@@ -7,21 +7,6 @@ interface Renderer
   fun ref load()
   fun render( values: TemplateValues box = TemplateValues): String val ?
 
-primitive FileReader
-  fun read(path: FilePath val): String val ? =>
-    match OpenFile(path)
-    | let file: File =>
-      var res: String iso = String()
-      while file.errno() is FileOK do
-        res = res + file.read_string(1024)
-      end
-      res.strip()
-      return res
-    else
-      Debug("Error opening file '" + path.path + "'")
-      error
-    end
-
 class TemplateRenderer is Renderer
   let _path: String val
   let _values: TemplateValues box

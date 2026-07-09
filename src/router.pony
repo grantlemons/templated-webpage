@@ -24,9 +24,11 @@ interface RoutePatch
 
 type RouteMap is Map[String val, Route]
 class Router is RequestHandler
+  let _file_auth: FileAuth
   let _map: RouteMap
 
   new val create(file_auth: FileAuth) =>
+    _file_auth = file_auth
     _map =
       RouteMap.create()
       .> insert("/", Page.home(file_auth))
@@ -36,14 +38,13 @@ class Router is RequestHandler
   fun tag name(): String val => "Router"
 
   fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext) =>
-    let page: (Route box | None) = try
+    let page: Route box = try
       _map(request.uri.path)?
     else
-      None
+      Page.fallback(_file_auth, request.uri.path)
     end
 
     match (request.method, page)
-      | (_, None) => StatusResponse(StatusNotFound).respond(responder)
       | (GET, let route': RouteGet box) =>
           route'.get(responder)
           None
