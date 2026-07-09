@@ -31,7 +31,7 @@ class Router is RequestHandler
     _file_auth = file_auth
     _map =
       RouteMap.create()
-      .> insert("/", Page.home(file_auth))
+      .> insert("/", Page.fallback(file_auth, "/home"))
       .> insert("/styles", Page.styles(file_auth))
       .> insert("/favicon.ico", Page.favicon(file_auth))
 

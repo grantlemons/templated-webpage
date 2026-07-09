@@ -30,9 +30,10 @@ actor Main
       end
 
     let auth = lori.TCPListenAuth(env.root)
+    let router = Router(FileAuth(env.root))
     let trash: Array[Disposable tag] val = [
-      Listener(env, auth, "0.0.0.0", "80", None)
-      Listener(env, auth, "0.0.0.0", "443", ssl_ctx)
+      Listener(env, auth, "0.0.0.0", "80", None, router)
+      Listener(env, auth, "0.0.0.0", "443", ssl_ctx, router)
     ]
 
     // dispose of listeners to allow the program to exit
@@ -58,7 +59,8 @@ actor Listener is lori.TCPListenerActor
     auth: lori.TCPListenAuth,
     host: String,
     port: String,
-    ssl_ctx: (SSLContext val | None)
+    ssl_ctx: (SSLContext val | None),
+    handler: RequestHandler val
   )
   =>
     _env = env
@@ -66,26 +68,14 @@ actor Listener is lori.TCPListenerActor
     _server_auth = lori.TCPServerAuth(auth)
     _config = stallion.ServerConfig(host, port)
     let host_uri = URI("http", URIAuthority(None, _config.host, try _config.port.u16()? end), "", None, None)
-    _handler = 
-      match \exhaustive\ ssl_ctx
-      | let _: SSLContext => Router(FileAuth(env.root))
-      | None => Router(FileAuth(env.root))
-      // | None => HttpsRedirectHandler(host_uri)
-      end
+    _handler = handler
     let max_spawn =
       match lori.MakeMaxSpawn(4000)
         | let max: lori.MaxSpawn => max
       else
         lori.DefaultMaxSpawn()
       end
-    _tcp_listener = lori.TCPListener(
-      auth,
-      host,
-      port,
-      this,
-      lori.DualStack,
-      max_spawn
-    )
+    _tcp_listener = lori.TCPListener(auth, host, port, this, lori.DualStack, max_spawn)
 
   fun ref _listener(): lori.TCPListener => _tcp_listener
 

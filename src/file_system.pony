@@ -17,7 +17,7 @@ primitive FileReader
       error
     end
 
-class FileListWalkHandler
+class ref ListFilesWalkHandler is WalkHandler
   var file_paths: Iter[FilePath val] ref = file_paths.maybe(None)
 
   fun ref apply(
@@ -76,3 +76,8 @@ primitive DirectoryReader
       Debug("Unable to get entries of " + dir_path.path)
       Iter[FilePath val].maybe(None)
     end
+
+  fun list_files_recursive(dir_path: FilePath val): Iter[FilePath val] ref =>
+    let handler: ListFilesWalkHandler ref = handler.create()
+    dir_path.walk(handler, false)
+    handler.file_paths

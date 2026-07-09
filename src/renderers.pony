@@ -1,11 +1,12 @@
 use "files"
 use "debug"
 use "templates"
+use "collections"
 use @system[I32](command: Pointer[U8] tag)
 
-interface Renderer
+interface Renderer is Stringable
   fun ref load()
-  fun render( values: TemplateValues box = TemplateValues): String val ?
+  fun render(values: TemplateValues box = TemplateValues): String val ?
 
 class TemplateRenderer is Renderer
   let _path: String val
@@ -21,6 +22,7 @@ class TemplateRenderer is Renderer
     _values = values
     _renderer = RawRenderer(file_auth, path)
 
+  fun string(): String iso^ => "TemplateRenderer -> " + _path
   fun ref load() => _renderer.load()
   fun render(
     values: TemplateValues box = TemplateValues
@@ -52,8 +54,8 @@ class RawRenderer is Renderer
   fun _read(path: String val): String val ? =>
     FileReader.read(FilePath(_file_auth, path))?
 
+  fun string(): String iso^ => "RawRenderer -> " + _path
   fun ref load() => 
-    Debug("Rendering " + _path)
     try _file_content = _read(_path)? end
 
   fun render(
@@ -63,6 +65,15 @@ class RawRenderer is Renderer
       | None => _read(_path)?
     end
   fun apply(): String val ? => render()?
+
+primitive PrevNextValues
+  fun scoped(
+    values': TemplateValues box = TemplateValues
+  ): TemplateValues box =>
+    let values = values'.scope()
+    values("prev") = "https://devmail.group/"
+    values("next") = "https://byronsharman.com/"
+    values
 
 class StyledRenderer is Renderer
   let _file_auth: FileAuth
@@ -80,19 +91,13 @@ class StyledRenderer is Renderer
   ) =>
     _file_auth = file_auth
     _template_renderer = TemplateRenderer(file_auth, template_path)
-    _body_renderer = TemplateRenderer(file_auth, body_path)
+    _body_renderer = RecursiveDependencyRenderer(file_auth, body_path)
     _style_renderer = RawRenderer(file_auth, stylesheet_path)
-    _values = values
-    _values = _prev_next_scope(consume values)
+    _values = PrevNextValues.scoped(consume values)
 
-  fun _prev_next_scope(
-    values': TemplateValues box = TemplateValues
-  ): TemplateValues box =>
-    let values = values'.scope()
-    values("prev") = "https://devmail.group/"
-    values("next") = "https://byronsharman.com/"
-    values
-
+  fun string(): String iso^ =>
+    let child_str: String val = _body_renderer.string()
+    "StyledRenderer -> " + child_str
   fun ref load() =>
     _template_renderer.load()
     _body_renderer.load()
@@ -107,6 +112,59 @@ class StyledRenderer is Renderer
   fun apply(
     values: TemplateValues box = TemplateValues
   ): String val ? => render(values)?
+
+class RecursiveDependencyRenderer is Renderer
+  let _dir_path: FilePath val
+  let _dep_renderers: Map[String val, Renderer ref] ref = _dep_renderers.create()
+  let _renderer: TemplateRenderer ref
+
+  new create(file_auth: FileAuth, path_str: String val) =>
+    let full_path = FilePath(file_auth, path_str)
+    _dir_path = FilePath(file_auth, Path.dir(full_path.path))
+    _renderer = TemplateRenderer(file_auth, path_str)
+
+    // add other files in the same dir as raw dependencies
+    let raw_deps = DirectoryReader.list_files(_dir_path)
+      .map[String val]({(p) => p.path})
+      .map[String val]({(p) => try Path.rel(Path.cwd(), p)? else p end})
+      .filter({(p) => p != full_path.path})
+    for file_path in raw_deps do
+      _dep_renderers.insert(Path.base(file_path, false), RawRenderer(file_auth, file_path))
+    end
+
+    // add all files one level down as recursive dependencies
+    let recursive_deps = DirectoryReader.list_dirs(_dir_path)
+      .flat_map[FilePath val]({(d) => DirectoryReader.list_files(d)})
+      .map[String val]({(p) => p.path})
+      .map[String val]({(p) => try Path.rel(Path.cwd(), p)? else p end})
+    for file_path in recursive_deps do
+      _dep_renderers.insert(Path.base(file_path, false), RecursiveDependencyRenderer(file_auth, file_path))
+    end
+
+  fun string(): String iso^ =>
+    let res: String ref = recover String end
+    res.append("RecursiveDependencyRenderer")
+    for (name, renderer) in _dep_renderers.pairs() do
+      let child_str: String ref = renderer.string()
+      child_str.replace("\t", "\t\t") // extra level of indent
+      res.append("\n\t." + name + " -> " + child_str)
+    end
+    let child_str: String ref = _renderer.string()
+    child_str.replace("\t", "\t\t") // extra level of indent
+    res.add("\n\t-> " + child_str)
+
+  fun ref load() =>
+    for renderer in _dep_renderers.values() do
+      renderer.load()
+    end
+    _renderer.load()
+  fun render(values: TemplateValues box = TemplateValues): String val ? =>
+    let values': TemplateValues ref = values.scope()
+    for (name, renderer) in _dep_renderers.pairs() do
+      let body = renderer.render()?
+      values'.unescaped(name, body)
+    end
+    _renderer.render(values')?
 
 class CodeRenderer is Renderer
   let _file_auth: FileAuth
@@ -130,6 +188,9 @@ class CodeRenderer is Renderer
       if @system(command.cstring()) != 0 then error end
     end
 
+  fun string(): String iso^ =>
+    let child_str: String val = _renderer.string()
+    "CodeRenderer -> " + child_str
   fun ref load() =>
     try
       generate()?
