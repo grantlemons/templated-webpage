@@ -66,11 +66,12 @@ actor Listener is lori.TCPListenerActor
     _server_auth = lori.TCPServerAuth(auth)
     _config = stallion.ServerConfig(host, port)
     let host_uri = URI("http", URIAuthority(None, _config.host, try _config.port.u16()? end), "", None, None)
-    _handler = match ssl_ctx
+    _handler = 
+      match \exhaustive\ ssl_ctx
       | let _: SSLContext => Router(FileAuth(env.root))
       | None => Router(FileAuth(env.root))
       // | None => HttpsRedirectHandler(host_uri)
-    end
+      end
     let max_spawn =
       match lori.MakeMaxSpawn(4000)
         | let max: lori.MaxSpawn => max

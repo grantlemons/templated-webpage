@@ -21,7 +21,7 @@ class HttpsRedirectHandler is RequestHandler
     let uri: URI val = URI(
       "https",
       match _host_uri.authority
-        | let auth: URIAuthority if auth.host != "0.0.0.0" => URIAuthority(None, auth.host, None)
+      | let auth: URIAuthority if auth.host != "0.0.0.0" => URIAuthority(None, auth.host, None)
       else URIAuthority(None, "localhost", None)
       end,
       request.uri.path,

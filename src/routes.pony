@@ -36,7 +36,7 @@ class Page is RouteGet
 
   fun get(responder: (Responder ref | None)): USize =>
     match _response
-      | let res: Response val => res.respond(responder)
-      | None => StatusResponse(StatusNotFound)
+    | let res: Response val => res.respond(responder)
+    | None => StatusResponse(StatusNotFound)
     end
     _size

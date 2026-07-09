@@ -38,24 +38,25 @@ class Router is RequestHandler
   fun tag name(): String val => "Router"
 
   fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext) =>
-    let page: Route box = try
-      _map(request.uri.path)?
-    else
-      Page.fallback(_file_auth, request.uri.path)
-    end
+    let page: Route box =
+      try
+        _map(request.uri.path)?
+      else
+        Page.fallback(_file_auth, request.uri.path)
+      end
 
     match (request.method, page)
-      | (GET, let route': RouteGet box) =>
-          route'.get(responder)
-          None
-      | (HEAD, let route': RouteGet box) =>
-          route'.head(responder)
-          None
-      | (POST, let route': RoutePost box) => route'.post(responder, context)
-      | (PUT, let route': RoutePut box) => route'.put(responder, context)
-      | (DELETE, let route': RouteDelete box) => route'.delete(responder, context)
-      | (OPTIONS, let route': RouteOptions box) => route'.options(responder)
-      | (PATCH, let route': RoutePatch box) => route'.patch(responder, context)
+    | (GET, let route': RouteGet box) =>
+        route'.get(responder)
+        None
+    | (HEAD, let route': RouteGet box) =>
+        route'.head(responder)
+        None
+    | (POST, let route': RoutePost box) => route'.post(responder, context)
+    | (PUT, let route': RoutePut box) => route'.put(responder, context)
+    | (DELETE, let route': RouteDelete box) => route'.delete(responder, context)
+    | (OPTIONS, let route': RouteOptions box) => route'.options(responder)
+    | (PATCH, let route': RoutePatch box) => route'.patch(responder, context)
     else
       Debug("Unsupported HTTP method!")
       StatusResponse(StatusNotFound).respond(responder)
