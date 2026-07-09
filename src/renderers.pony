@@ -126,8 +126,8 @@ class RecursiveDependencyRenderer is Renderer
     // add other files in the same dir as raw dependencies
     let raw_deps = DirectoryReader.list_files(_dir_path)
       .map[String val]({(p) => p.path})
-      .map[String val]({(p) => try Path.rel(Path.cwd(), p)? else p end})
       .filter({(p) => p != full_path.path})
+      .map[String val]({(p) => try Path.rel(Path.cwd(), p)? else p end})
     for file_path in raw_deps do
       _dep_renderers.insert(Path.base(file_path, false), RawRenderer(file_auth, file_path))
     end
