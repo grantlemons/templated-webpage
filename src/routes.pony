@@ -12,8 +12,12 @@ class Page is RouteGet
 
   new fallback(file_auth: FileAuth, path: String val) =>
     _name = path
-    let values = TemplateValues
-    _renderer = StyledRenderer(file_auth, "pages" + path + "/index.html", values)
+    let body_path: String val = "pages" + path + "/index.html"
+    _renderer = RecursiveDependencyRenderer(
+      file_auth,
+      body_path,
+      StyledRenderer(file_auth, body_path)
+    )
     bake_response()
 
   new styles(file_auth: FileAuth) =>

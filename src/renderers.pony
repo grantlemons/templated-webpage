@@ -77,7 +77,6 @@ primitive PrevNextValues
 
 class StyledRenderer is Renderer
   let _file_auth: FileAuth
-  var _values: TemplateValues box
   var _template_renderer: TemplateRenderer ref
   var _body_renderer: Renderer ref
   var _style_renderer: Renderer ref
@@ -85,15 +84,13 @@ class StyledRenderer is Renderer
   new create(
     file_auth: FileAuth,
     body_path: String val,
-    values: TemplateValues box = TemplateValues,
     stylesheet_path: String val = "public/styles.css",
     template_path: String val = "assets/template.html"
   ) =>
     _file_auth = file_auth
     _template_renderer = TemplateRenderer(file_auth, template_path)
-    _body_renderer = RecursiveDependencyRenderer(file_auth, body_path)
+    _body_renderer = TemplateRenderer(file_auth, body_path)
     _style_renderer = RawRenderer(file_auth, stylesheet_path)
-    _values = PrevNextValues.scoped(consume values)
 
   fun string(): String iso^ =>
     let res: String ref = recover String end
@@ -114,12 +111,12 @@ class StyledRenderer is Renderer
     _body_renderer.load()
     _style_renderer.load()
   fun render(
-    body_values: TemplateValues box = TemplateValues
+    values: TemplateValues box = TemplateValues
   ): String val ? =>
-    let values = _values.scope()
-    values.unescaped("styles", _style_renderer.render()?)
-    values.unescaped("body", _body_renderer.render(body_values)?)
-    _template_renderer.render(values)?
+    let values' = values.scope()
+    values'.unescaped("styles", _style_renderer.render()?)
+    values'.unescaped("body", _body_renderer.render(values)?)
+    _template_renderer.render(values')?
   fun apply(
     values: TemplateValues box = TemplateValues
   ): String val ? => render(values)?
@@ -127,12 +124,12 @@ class StyledRenderer is Renderer
 class RecursiveDependencyRenderer is Renderer
   let _dir_path: FilePath val
   let _dep_renderers: Map[String val, Renderer ref] ref = _dep_renderers.create()
-  let _renderer: TemplateRenderer ref
+  let _renderer: Renderer ref
 
-  new create(file_auth: FileAuth, path_str: String val) =>
+  new create(file_auth: FileAuth, path_str: String val, renderer: Renderer ref) =>
+    _renderer = renderer
     let full_path = FilePath(file_auth, path_str)
     _dir_path = FilePath(file_auth, Path.dir(full_path.path))
-    _renderer = TemplateRenderer(file_auth, path_str)
 
     // add other files in the same dir as raw dependencies
     let raw_deps = DirectoryReader.list_files(_dir_path)
@@ -149,7 +146,14 @@ class RecursiveDependencyRenderer is Renderer
       .map[String val]({(p) => p.path})
       .map[String val]({(p) => try Path.rel(Path.cwd(), p)? else p end})
     for file_path in recursive_deps do
-      _dep_renderers.insert(Path.base(file_path, false), RecursiveDependencyRenderer(file_auth, file_path))
+      _dep_renderers.insert(
+        Path.base(file_path, false),
+        RecursiveDependencyRenderer(
+          file_auth,
+          file_path,
+          TemplateRenderer(file_auth, file_path)
+        )
+      )
     end
 
   fun string(): String iso^ =>
@@ -172,7 +176,7 @@ class RecursiveDependencyRenderer is Renderer
   fun render(values: TemplateValues box = TemplateValues): String val ? =>
     let values': TemplateValues ref = values.scope()
     for (name, renderer) in _dep_renderers.pairs() do
-      let body = renderer.render()?
+      let body = renderer.render(values)?
       values'.unescaped(name, body)
     end
     _renderer.render(values')?
