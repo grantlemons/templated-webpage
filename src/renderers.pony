@@ -96,8 +96,19 @@ class StyledRenderer is Renderer
     _values = PrevNextValues.scoped(consume values)
 
   fun string(): String iso^ =>
-    let child_str: String val = _body_renderer.string()
-    "StyledRenderer -> " + child_str
+    let res: String ref = recover String end
+    res.append("StyledRenderer ")
+    for (name, renderer) in [
+      ("template", _template_renderer)
+      ("style", _style_renderer)
+      ("body", _body_renderer)
+    ].values() do
+      let child_str: String ref = renderer.string()
+      child_str.replace("\t", "\t\t") // extra level of indent
+      res.append("\n\t." + name + " -> " + child_str)
+    end
+    res.string()
+
   fun ref load() =>
     _template_renderer.load()
     _body_renderer.load()
