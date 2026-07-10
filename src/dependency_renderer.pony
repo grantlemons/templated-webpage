@@ -12,14 +12,14 @@ class DependencyRenderer is Renderer
     _renderer = renderer
     _dir_path = FilePath(file_auth, Path.dir(path_str))
     add_base_deps(file_auth)
-    add_raw_deps(file_auth, FilePath(file_auth, path_str)) // pass absolute path to compare
-    add_templated_deps(file_auth)
+    add_raw_deps(file_auth, _dir_path, FilePath(file_auth, path_str)) // pass absolute path to compare
+    add_templated_deps(file_auth, _dir_path)
 
   new without_base(file_auth: FileAuth, path_str: String val, renderer: Renderer ref) =>
     _renderer = renderer
     _dir_path = FilePath(file_auth, Path.dir(path_str))
-    add_raw_deps(file_auth, FilePath(file_auth, path_str)) // pass absolute path to compare
-    add_templated_deps(file_auth)
+    add_raw_deps(file_auth, _dir_path, FilePath(file_auth, path_str)) // pass absolute path to compare
+    add_templated_deps(file_auth, _dir_path)
 
   fun is_code_extension(ext: String val): Bool => match ext
       | "md" => false
@@ -45,14 +45,14 @@ class DependencyRenderer is Renderer
       if Path.ext(Path.base(file_path, false)) == "" then
         _dep_renderers.insert(
           Path.base(file_path, false),
-          DependencyRenderer.without_base(file_auth, file_path, renderer)
+          renderer
         )
       end
     end
 
-  fun ref add_raw_deps(file_auth: FileAuth, self_path: FilePath val) =>
+  fun ref add_raw_deps(file_auth: FileAuth, dir_path: FilePath val, self_path: FilePath val) =>
     // add other files in the same dir as raw dependencies
-    let raw_deps = DirectoryReader.list_files(_dir_path)
+    let raw_deps = DirectoryReader.list_files(dir_path)
       .map[String val]({(p) => p.path})
       .filter({(p) => p != self_path.path})
       .map[String val]({(p) => try Path.rel(Path.cwd(), p)? else p end})
@@ -62,14 +62,14 @@ class DependencyRenderer is Renderer
           then CodeRenderer(file_auth, file_path)
           else RawRenderer(file_auth, file_path)
         end
-        if Path.ext(Path.base(file_path, false)) == "" then
-          _dep_renderers.insert(Path.base(file_path, false), renderer)
-        end
+      if Path.ext(Path.base(file_path, false)) == "" then
+        _dep_renderers.insert(Path.base(file_path, false), renderer)
+      end
     end
 
-  fun ref add_templated_deps(file_auth: FileAuth) =>
+  fun ref add_templated_deps(file_auth: FileAuth, dir_path: FilePath val) =>
     // add all files one level down as templated dependencies
-    let templated_deps = DirectoryReader.list_dirs(_dir_path)
+    let templated_deps = DirectoryReader.list_dirs(dir_path)
       .flat_map[FilePath val]({(d) => DirectoryReader.list_files(d)})
       .map[String val]({(p) => p.path})
       .map[String val]({(p) => try Path.rel(Path.cwd(), p)? else p end})
@@ -79,9 +79,15 @@ class DependencyRenderer is Renderer
           then CodeRenderer(file_auth, file_path)
           else DependencyRenderer(file_auth, file_path, TemplateRenderer(file_auth, file_path))
         end
-        if Path.ext(Path.base(file_path, false)) == "" then
-          _dep_renderers.insert(Path.base(file_path, false), renderer)
-        end
+      if Path.ext(Path.base(file_path, false)) == "" then
+        _dep_renderers.insert_if_absent(Path.base(file_path, false), renderer)
+      end
+    end
+
+    // recursively add in preorderorder traversal
+    // keep earliest result
+    for dir in DirectoryReader.list_dirs(dir_path) do
+      add_templated_deps(file_auth, dir)
     end
 
   fun string(): String iso^ =>

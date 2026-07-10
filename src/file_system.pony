@@ -27,11 +27,11 @@ class ref ListFilesWalkHandler is WalkHandler
     try
       file_paths = Iter[FilePath val].chain(
         [
-          file_paths
           DirectoryReader.keep_files(
             dir_path,
             Directory(dir_path)?.entries()?.values()
           )
+          file_paths
         ].values()
       )
     end

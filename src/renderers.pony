@@ -52,7 +52,7 @@ class RawRenderer is Renderer
   fun _read(path: String val): String val ? =>
     FileReader.read(FilePath(_file_auth, path))?
 
-  fun string(): String iso^ => "RawRenderer -> " + _path
+  fun string(): String iso^ => _path.string()
   fun ref load() => 
     try _file_content = _read(_path)? end
 
@@ -94,7 +94,6 @@ class StyledRenderer is Renderer
     let res: String ref = recover String end
     res.append("StyledRenderer ")
     for (name, renderer) in [
-      ("template", _template_renderer)
       ("style", _style_renderer)
       ("body", _body_renderer)
     ].values() do
@@ -102,7 +101,9 @@ class StyledRenderer is Renderer
       child_str.replace("\t", "\t\t") // extra level of indent
       res.append("\n\t." + name + " -> " + child_str)
     end
-    res.string()
+    let child_str: String ref = _template_renderer.string()
+    child_str.replace("\t", "\t\t") // extra level of indent
+    res.add("\n\t-> " + child_str)
 
   fun ref load() =>
     _template_renderer.load()
