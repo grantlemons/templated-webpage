@@ -60,7 +60,7 @@ class RawRenderer is Renderer
     values: TemplateValues box = TemplateValues
   ): String val ? => match _file_content
       | let content: String val => content
-      | None => _read(_path)?
+      | None => error
     end
   fun apply(): String val ? => render()?
 

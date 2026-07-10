@@ -21,20 +21,33 @@ class DependencyRenderer is Renderer
     add_raw_deps(file_auth, FilePath(file_auth, path_str)) // pass absolute path to compare
     add_templated_deps(file_auth)
 
+  fun is_code_extension(ext: String val): Bool => match ext
+      | "md" => false
+      | "html" => false
+      | "css" => false
+      | "txt" => false
+      | "" => false
+    else
+      true
+    end
+
   fun ref add_base_deps(file_auth: FileAuth) =>
     // add all files in base assets as templated dependencies
     let base_deps = DirectoryReader.list_files(FilePath(file_auth, "pages/assets/"))
       .map[String val]({(p) => p.path})
       .map[String val]({(p) => try Path.rel(Path.cwd(), p)? else p end})
     for file_path in base_deps do
-      _dep_renderers.insert(
-        Path.base(file_path, false),
-        DependencyRenderer.without_base(
-          file_auth,
-          file_path,
-          TemplateRenderer(file_auth, file_path)
+      let renderer =
+        if is_code_extension(Path.ext(file_path))
+          then CodeRenderer(file_auth, file_path)
+          else RawRenderer(file_auth, file_path)
+        end
+      if Path.ext(Path.base(file_path, false)) == "" then
+        _dep_renderers.insert(
+          Path.base(file_path, false),
+          DependencyRenderer.without_base(file_auth, file_path, renderer)
         )
-      )
+      end
     end
 
   fun ref add_raw_deps(file_auth: FileAuth, self_path: FilePath val) =>
@@ -44,7 +57,14 @@ class DependencyRenderer is Renderer
       .filter({(p) => p != self_path.path})
       .map[String val]({(p) => try Path.rel(Path.cwd(), p)? else p end})
     for file_path in raw_deps do
-      _dep_renderers.insert(Path.base(file_path, false), RawRenderer(file_auth, file_path))
+      let renderer =
+        if is_code_extension(Path.ext(file_path))
+          then CodeRenderer(file_auth, file_path)
+          else RawRenderer(file_auth, file_path)
+        end
+        if Path.ext(Path.base(file_path, false)) == "" then
+          _dep_renderers.insert(Path.base(file_path, false), renderer)
+        end
     end
 
   fun ref add_templated_deps(file_auth: FileAuth) =>
@@ -54,14 +74,14 @@ class DependencyRenderer is Renderer
       .map[String val]({(p) => p.path})
       .map[String val]({(p) => try Path.rel(Path.cwd(), p)? else p end})
     for file_path in templated_deps do
-      _dep_renderers.insert(
-        Path.base(file_path, false),
-        DependencyRenderer(
-          file_auth,
-          file_path,
-          TemplateRenderer(file_auth, file_path)
-        )
-      )
+      let renderer =
+        if is_code_extension(Path.ext(file_path))
+          then CodeRenderer(file_auth, file_path)
+          else DependencyRenderer(file_auth, file_path, TemplateRenderer(file_auth, file_path))
+        end
+        if Path.ext(Path.base(file_path, false)) == "" then
+          _dep_renderers.insert(Path.base(file_path, false), renderer)
+        end
     end
 
   fun string(): String iso^ =>
@@ -84,7 +104,6 @@ class DependencyRenderer is Renderer
   fun render(values: TemplateValues box = TemplateValues): String val ? =>
     let values': TemplateValues ref = values.scope()
     for (name, renderer) in _dep_renderers.pairs() do
-      let body = renderer.render(values)?
-      values'.unescaped(name, body)
+      values'.unescaped(name, renderer.render(values)?)
     end
     _renderer.render(values')?

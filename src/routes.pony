@@ -7,6 +7,7 @@ use "collections"
 class Page is RouteGet
   let _name: String val
   let _renderer: Renderer ref
+  var _content_type: String val = "text/html"
   var _response: (Response val | None) = None
   var _size: USize = 0
 
@@ -32,16 +33,26 @@ class Page is RouteGet
 
   fun string(): String val => _name + ": " + _renderer.string()
   fun ref bake_response(content_type: String val = "text/html") =>
+    _content_type = content_type
     try
       let body = _renderer.render()?
       _response = OkResponse(body, content_type)
       _size = body.size()
+    else
+      Debug("ERROR: failed to render " + _name)
     end
     Debug("Rendered " + string())
 
   fun get(responder: (Responder ref | None)): USize =>
-    match _response
-    | let res: Response val => res.respond(responder)
-    | None => StatusResponse(StatusNotFound)
-    end
-    _size
+    (let response, let size) = 
+      match _response
+      | let res: Response val => (res, _size)
+      | None => try
+          let body = _renderer.render()?
+          (OkResponse(body, _content_type), body.size())
+        else
+          (StatusResponse(StatusNotFound), 0)
+        end
+      end
+    response.respond(responder)
+    size
