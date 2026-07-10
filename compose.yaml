@@ -9,7 +9,15 @@ services:
         - action: rebuild
           path: src
           initial_sync: true
-        - action: sync
+        - action: sync+restart
+          path: public
+          target: /app/public
+          initial_sync: true
+        - action: sync+restart
+          path: crypto
+          target: /app/crypto
+          initial_sync: true
+        - action: sync+restart
           path: pages
           target: /app/pages
           initial_sync: true

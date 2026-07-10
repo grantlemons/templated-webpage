@@ -1,84 +1,63 @@
-use "uri"
+use "files"
+use "debug"
 use "collections"
 use "stallion"
 
-interface Router
-  fun ref route(request: Request val, responder: Responder ref)
+type Route is (RouteGet | RoutePost | RoutePut | RouteDelete | RouteOptions | RoutePatch)
 
-trait Page
-trait Context
-
-class DummyContext is Context
-
-// this is a trait because it will also apply Page
-trait PageGet is Page
-  fun get(responder: Responder ref)
-  fun head(responder: Responder ref) => OkResponse.empty().respond(responder)
-interface PagePost is Page
+interface RouteGet
+  fun get(responder: (Responder ref | None)): USize
+  fun head(responder: (Responder ref | None)): USize =>
+    let size = get(None)
+    OkResponse.empty_size(size).respond(responder)
+    size
+interface RoutePost
   fun post(responder: Responder ref, context: Context ref!)
-interface PagePut is Page
+interface RoutePut
   fun put(responder: Responder ref, context: Context ref!)
-interface PageDelete is Page
+interface RouteDelete
   fun delete(responder: Responder ref, context: Context ref!)
-interface PageOptions is Page
+interface RouteOptions
   fun options(responder: Responder ref)
-interface PagePatch is Page
+interface RoutePatch
   fun patch(responder: Responder ref, context: Context ref!)
 
-class HttpsRedirectRouter is Router
-  let _env: Env
-  let _host_uri: URI val
-
-  new create(env: Env, host_uri: URI val) =>
-    _env = env
-    _host_uri = host_uri
-
-  fun ref route(request: Request val, responder: Responder ref) =>
-    let uri: URI val = URI(
-      "https",
-      match _host_uri.authority
-        | let auth: URIAuthority if auth.host != "0.0.0.0" => URIAuthority(None, auth.host, None)
-      else URIAuthority(None, "localhost", None)
-      end,
-      request.uri.path,
-      request.uri.query,
-      request.uri.fragment
-    )
-    _env.out.print("Redirecting from " + request.uri.string() + " to " + uri.string())
-    RedirectResponse(uri).respond(responder)
-
-type RouteMap is Map[String val, Page]
-class PageRouter is Router
-  let _env: Env
-  let _context: Context ref!
+type RouteMap is Map[String val, Route]
+class Router is RequestHandler
+  let _file_auth: FileAuth
   let _map: RouteMap
 
-  new create(env: Env, context: Context ref = DummyContext) =>
-    _env = env
-    _context = context
+  new val create(file_auth: FileAuth) =>
+    _file_auth = file_auth
     _map =
       RouteMap.create()
-      .> insert("/", HomePage.create(env))
-      .> insert("/styles", SiteCss.create(env))
-      .> insert("/favicon.ico", Favicon.create(env))
+      .> insert("/", Page.fallback(file_auth, "/home"))
+      .> insert("/styles", Page.styles(file_auth))
+      .> insert("/favicon.ico", Page.favicon(file_auth))
 
-  fun ref route(request: Request val, responder: Responder ref) =>
-    let page: (Page box | None) = try
-      _map(request.uri.path)?
-    else
-      None
-    end
+  fun tag name(): String val => "Router"
+
+  fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext) =>
+    let page: Route box =
+      try
+        _map(request.uri.path)?
+      else
+        Page.fallback(_file_auth, request.uri.path)
+      end
 
     match (request.method, page)
-      | (_, None) => StatusResponse(StatusNotFound).respond(responder)
-      | (GET, let page': PageGet box) => page'.get(responder)
-      | (HEAD, let page': PageGet box) => page'.head(responder)
-      | (POST, let page': PagePost box) => page'.post(responder, _context)
-      | (PUT, let page': PagePut box) => page'.put(responder, _context)
-      | (DELETE, let page': PageDelete box) => page'.delete(responder, _context)
-      | (OPTIONS, let page': PageOptions box) => page'.options(responder)
-      | (PATCH, let page': PagePatch box) => page'.patch(responder, _context)
+    | (GET, let route': RouteGet box) =>
+        route'.get(responder)
+        None
+    | (HEAD, let route': RouteGet box) =>
+        route'.head(responder)
+        None
+    | (POST, let route': RoutePost box) => route'.post(responder, context)
+    | (PUT, let route': RoutePut box) => route'.put(responder, context)
+    | (DELETE, let route': RouteDelete box) => route'.delete(responder, context)
+    | (OPTIONS, let route': RouteOptions box) => route'.options(responder)
+    | (PATCH, let route': RoutePatch box) => route'.patch(responder, context)
     else
-      _env.err.print("Unsupported HTTP method!")
+      Debug("Unsupported HTTP method!")
       StatusResponse(StatusNotFound).respond(responder)
     end

@@ -1,85 +1,58 @@
 use "files"
+use "debug"
 use "templates"
 use "stallion"
+use "collections"
 
-class HomePage is PageGet
-  let _env: Env
-  let _renderer: RenderStyled
-  let _values: TemplateValues box
-  let title: String val
-  let date: String val
+class Page is RouteGet
+  let _name: String val
+  let _renderer: Renderer ref
+  var _content_type: String val = "text/html"
+  var _response: (Response val | None) = None
+  var _size: USize = 0
 
-  new create(env: Env, values': TemplateValues box = TemplateValues) =>
-    title = "Lorem Ipsum"
-    date = "2026-07-01"
-    _env = env
+  new fallback(file_auth: FileAuth, path: String val) =>
+    _name = path
+    let body_path: String val = "pages" + path + "/index.html"
+    _renderer = DependencyRenderer(
+      file_auth,
+      body_path,
+      StyledRenderer(file_auth, body_path)
+    )
+    bake_response()
 
-    let code_renderer: RenderCode = RenderCode(FilePath.create(FileAuth(env.root), "pages/pygmentize.c"), env)
-    let rendered_code: String val = try code_renderer()? else "" end
+  new styles(file_auth: FileAuth) =>
+    _name = "/styles.css"
+    _renderer = RawRenderer(file_auth, "public/styles.css")
+    bake_response("text/css")
 
-    let values = values'.scope()
-    values("title") = title
-    values("date") = date
-    values.unescaped("snippet", rendered_code)
-    _values = values
-    _renderer = RenderStyled("pages/home.html", "pages/styles.css", env, values)
+  new favicon(file_auth: FileAuth) =>
+    _name = "/favicon.ico"
+    _renderer = RawRenderer(file_auth, "public/favicon.ico")
+    bake_response("img/ico")
 
-  fun get(responder: Responder ref) =>
-    let values = _values.scope()
+  fun string(): String iso^ => _name + ": " + _renderer.string()
+  fun ref bake_response(content_type: String val = "text/html") =>
+    _content_type = content_type
+    try
+      let body = _renderer.render()?
+      _response = OkResponse(body, content_type)
+      _size = body.size()
+    else
+      Debug("ERROR: failed to render " + _name)
+    end
+    Debug(string())
 
-    let response = try
-        OkResponse(_renderer.apply(values)?)
-      else
-        StatusResponse(StatusNotFound)
+  fun get(responder: (Responder ref | None)): USize =>
+    (let response, let size) = 
+      match _response
+      | let res: Response val => (res, _size)
+      | None => try
+          let body = _renderer.render()?
+          (OkResponse(body, _content_type), body.size())
+        else
+          (StatusResponse(StatusNotFound), 0)
+        end
       end
     response.respond(responder)
-
-class AnyPage is PageGet
-  let _env: Env
-  let _renderer: RenderStyled
-
-  new create(env: Env, page: String val) =>
-    _env = env
-    let values = TemplateValues
-    values("title") = page
-    _renderer = RenderStyled("pages" + page, "pages/styles.css", env, values)
-
-  fun get(responder: Responder ref) =>
-    let response = try
-        OkResponse(_renderer.apply(TemplateValues)?)
-      else
-        StatusResponse(StatusNotFound)
-      end
-    response.respond(responder)
-
-class SiteCss is PageGet
-  let _env: Env
-  let _renderer: RenderUntemplated
-
-  new create(env: Env) =>
-    _env = env
-    _renderer = RenderUntemplated("pages/styles.css", env)
-
-  fun get(responder: Responder ref) =>
-    let response = try
-        OkResponse(_renderer.apply()?)
-      else
-        StatusResponse(StatusNotFound)
-      end
-    response.respond(responder)
-
-class Favicon is PageGet
-  let _env: Env
-  let _renderer: RenderUntemplated
-
-  new create(env: Env) =>
-    _env = env
-    _renderer = RenderUntemplated("pages/favicon.ico", env)
-
-  fun get(responder: Responder ref) =>
-    let response = try
-        OkResponse(_renderer.apply()?)
-      else
-        StatusResponse(StatusNotFound)
-      end
-    response.respond(responder)
+    size
