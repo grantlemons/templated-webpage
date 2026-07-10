@@ -11,9 +11,9 @@ class DependencyRenderer is Renderer
   new create(file_auth: FileAuth, path_str: String val, renderer: Renderer ref) =>
     _renderer = renderer
     _dir_path = FilePath(file_auth, Path.dir(path_str))
-    add_base_deps(file_auth)
     add_raw_deps(file_auth, _dir_path, FilePath(file_auth, path_str)) // pass absolute path to compare
     add_templated_deps(file_auth, _dir_path)
+    add_base_deps(file_auth)
 
   new without_base(file_auth: FileAuth, path_str: String val, renderer: Renderer ref) =>
     _renderer = renderer
@@ -43,7 +43,7 @@ class DependencyRenderer is Renderer
           else RawRenderer(file_auth, file_path)
         end
       if Path.ext(Path.base(file_path, false)) == "" then
-        _dep_renderers.insert(
+        _dep_renderers.insert_if_absent(
           Path.base(file_path, false),
           renderer
         )
@@ -63,7 +63,7 @@ class DependencyRenderer is Renderer
           else RawRenderer(file_auth, file_path)
         end
       if Path.ext(Path.base(file_path, false)) == "" then
-        _dep_renderers.insert(Path.base(file_path, false), renderer)
+        _dep_renderers.insert_if_absent(Path.base(file_path, false), renderer)
       end
     end
 
