@@ -9,27 +9,30 @@ use lori = "lori"
 interface Disposable
   fun tag dispose(): None val
 
+primitive SSLContextFactory
+  fun cert_auth(env: Env): SSLContext ? =>
+    let file_auth = FileAuth(env.root)
+    recover val
+      SSLContext
+        .> set_authority(
+          FilePath(file_auth, "crypto/cert.pem"))?
+        .> set_cert(
+          FilePath(file_auth, "crypto/cert.pem"),
+          FilePath(file_auth, "crypto/key.pem"))?
+        .> set_client_verify(true)
+        .> set_server_verify(false)
+    end
+
 actor Main
   new create(env: Env) =>
-    let file_auth = FileAuth(env.root)
-    let ssl_ctx =
+    let auth = lori.TCPListenAuth(env.root)
+    let ssl_ctx: SSLContext =
       try
-        recover val
-          SSLContext
-            .> set_authority(
-              FilePath(file_auth, "crypto/cert.pem"))?
-            .> set_cert(
-              FilePath(file_auth, "crypto/cert.pem"),
-              FilePath(file_auth, "crypto/key.pem"))?
-            .> set_client_verify(true)
-            .> set_server_verify(false)
-        end
+        SSLContextFactory.cert_auth(env)?
       else
-        env.out.print("Unable to set up SSL context")
+        env.err.print("Unable to set up SSL context")
         return
       end
-
-    let auth = lori.TCPListenAuth(env.root)
     let router = Router(FileAuth(env.root))
     let trash: Array[Disposable tag] val = [
       Listener(env, auth, "0.0.0.0", "80", None, router)
@@ -37,14 +40,13 @@ actor Main
     ]
 
     // dispose of listeners to allow the program to exit
-    SignalHandler(
+    let sig_handler =
       object iso is SignalNotify
         fun ref apply(count: U32 val): Bool val =>
           for t in trash.values() do t.dispose() end
           false
-      end,
-      Sig.term()
-    )
+      end
+    SignalHandler(consume sig_handler, Sig.term())
 
 actor Listener is lori.TCPListenerActor
   let _env: Env

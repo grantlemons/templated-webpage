@@ -15,7 +15,7 @@ class HttpsRedirectHandler is RequestHandler
   new val create(host_uri: URI val) =>
     _host_uri = host_uri
 
-  fun tag name(): String val => "Https Redirect Handler"
+  fun tag name(): String val => "Https Redirector"
 
   fun val handle(request: Request val, responder: Responder ref, context: Context ref = DummyContext) =>
     let uri: URI val = URI(
