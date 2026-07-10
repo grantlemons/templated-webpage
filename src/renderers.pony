@@ -83,7 +83,7 @@ class StyledRenderer is Renderer
     file_auth: FileAuth,
     body_path: String val,
     stylesheet_path: String val = "public/styles.css",
-    template_path: String val = "assets/template.html"
+    template_path: String val = "pages/template.html"
   ) =>
     _file_auth = file_auth
     _template_renderer = TemplateRenderer(file_auth, template_path)

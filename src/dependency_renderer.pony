@@ -11,20 +11,25 @@ class DependencyRenderer is Renderer
   new create(file_auth: FileAuth, path_str: String val, renderer: Renderer ref) =>
     _renderer = renderer
     _dir_path = FilePath(file_auth, Path.dir(path_str))
-
     add_base_deps(file_auth)
+    add_raw_deps(file_auth, FilePath(file_auth, path_str)) // pass absolute path to compare
+    add_templated_deps(file_auth)
+
+  new without_base(file_auth: FileAuth, path_str: String val, renderer: Renderer ref) =>
+    _renderer = renderer
+    _dir_path = FilePath(file_auth, Path.dir(path_str))
     add_raw_deps(file_auth, FilePath(file_auth, path_str)) // pass absolute path to compare
     add_templated_deps(file_auth)
 
   fun ref add_base_deps(file_auth: FileAuth) =>
     // add all files in base assets as templated dependencies
-    let base_deps = DirectoryReader.list_dirs(FilePath(file_auth, "assets/"))
-      .flat_map[FilePath val]({(d) => DirectoryReader.list_files(d)})
+    let base_deps = DirectoryReader.list_files(FilePath(file_auth, "pages/assets/"))
       .map[String val]({(p) => p.path})
+      .map[String val]({(p) => try Path.rel(Path.cwd(), p)? else p end})
     for file_path in base_deps do
       _dep_renderers.insert(
         Path.base(file_path, false),
-        DependencyRenderer(
+        DependencyRenderer.without_base(
           file_auth,
           file_path,
           TemplateRenderer(file_auth, file_path)

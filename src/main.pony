@@ -17,10 +17,10 @@ actor Main
         recover val
           SSLContext
             .> set_authority(
-              FilePath(file_auth, "assets/cert.pem"))?
+              FilePath(file_auth, "crypto/cert.pem"))?
             .> set_cert(
-              FilePath(file_auth, "assets/cert.pem"),
-              FilePath(file_auth, "assets/key.pem"))?
+              FilePath(file_auth, "crypto/cert.pem"),
+              FilePath(file_auth, "crypto/key.pem"))?
             .> set_client_verify(true)
             .> set_server_verify(false)
         end

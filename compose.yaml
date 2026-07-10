@@ -14,6 +14,10 @@ services:
           target: /app/public
           initial_sync: true
         - action: sync+restart
-          path: assets
-          target: /app/assets
+          path: crypto
+          target: /app/crypto
+          initial_sync: true
+        - action: sync+restart
+          path: pages
+          target: /app/pages
           initial_sync: true
