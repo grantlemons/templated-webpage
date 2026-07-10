@@ -31,7 +31,7 @@ class Page is RouteGet
     _renderer = RawRenderer(file_auth, "public/favicon.ico")
     bake_response("img/ico")
 
-  fun string(): String val => _name + ": " + _renderer.string()
+  fun string(): String iso^ => _name + ": " + _renderer.string()
   fun ref bake_response(content_type: String val = "text/html") =>
     _content_type = content_type
     try
@@ -41,7 +41,7 @@ class Page is RouteGet
     else
       Debug("ERROR: failed to render " + _name)
     end
-    Debug("Rendered " + string())
+    Debug(string())
 
   fun get(responder: (Responder ref | None)): USize =>
     (let response, let size) = 
