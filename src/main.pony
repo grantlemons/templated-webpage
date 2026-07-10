@@ -101,6 +101,7 @@ actor Listener is lori.TCPListenerActor
 actor Webserver is stallion.HTTPServerActor
   let _handler: RequestHandler val
   var _http: stallion.HTTPServer = stallion.HTTPServer.none()
+  var _request_count: USize = 0
 
   new create(
     handler: RequestHandler val,
@@ -122,4 +123,9 @@ actor Webserver is stallion.HTTPServerActor
   fun ref on_request_complete(
     request: stallion.Request val,
     responder: stallion.Responder ref
-  ) => _handler.handle(request, responder)
+  ) =>
+    _handler.handle(request, responder)
+    _request_count = _request_count + 1
+    if (_request_count % 5) == 0 then
+      _http.yield_read()
+    end
