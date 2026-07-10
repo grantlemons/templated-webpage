@@ -2,4 +2,5 @@ _corral
 _repos
 **/*.pem
 **/*.o
+**/*.*.html
 main
