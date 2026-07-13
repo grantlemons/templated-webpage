@@ -43,8 +43,9 @@ class val OkResponse is Response
       .add_chunk(body)
       .build()
 
-  new val empty_size(size: USize) =>
+  new val empty_size(size: USize, content_type: String val = "text/html") =>
     _response = ResponseBuilder(StatusOK)
+      .add_header("Content-Type", content_type)
       .add_header("Content-Length", size.string())
       .finish_headers()
       .build()

@@ -72,7 +72,7 @@ actor Listener is lori.TCPListenerActor
     let host_uri = URI("http", URIAuthority(None, _config.host, try _config.port.u16()? end), "", None, None)
     _handler = handler
     let max_spawn =
-      match lori.MakeMaxSpawn(4000)
+      match lori.MakeMaxSpawn(700)
         | let max: lori.MaxSpawn => max
       else
         lori.DefaultMaxSpawn()
