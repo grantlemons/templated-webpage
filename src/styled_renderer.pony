@@ -2,15 +2,6 @@ use "files"
 use "debug"
 use "templates"
 
-primitive PrevNextValues
-  fun scoped(
-    values': TemplateValues box = TemplateValues
-  ): TemplateValues box =>
-    let values = values'.scope()
-    values("prev") = "https://devmail.group/"
-    values("next") = "https://byronsharman.com/"
-    values
-
 class StyledRenderer is Renderer
   let _file_auth: FileAuth
   var _template_renderer: TemplateRenderer ref
