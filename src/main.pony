@@ -3,6 +3,7 @@ use "signals"
 use "debug"
 use "ssl/net"
 use "uri"
+use "collections"
 use stallion = "stallion"
 use lori = "lori"
 
@@ -72,7 +73,7 @@ actor Listener is lori.TCPListenerActor
     let host_uri = URI("http", URIAuthority(None, _config.host, try _config.port.u16()? end), "", None, None)
     _handler = handler
     let max_spawn =
-      match lori.MakeMaxSpawn(700)
+      match lori.MakeMaxSpawn(500)
         | let max: lori.MaxSpawn => max
       else
         lori.DefaultMaxSpawn()
