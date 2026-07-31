@@ -31,6 +31,7 @@ header {
 footer > nav {
 	display: flex;
 	flex-direction: row;
+	flex-wrap: wrap;
 	justify-content: space-around;
 	align-items: center;
 	padding-top: 1.5em;
@@ -123,6 +124,13 @@ blockquote > div.quote > div:first-child ~ div {
 	flex-direction: column;
 	align-items: stretch;
 	gap: 0.5em;
+}
+
+#writing {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	gap: 0.5em 1.5em;
 }
 
 div.highlight .c {
