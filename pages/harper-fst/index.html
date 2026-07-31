@@ -1,0 +1,123 @@
+<h2>Introduction</h2>
+<hr />
+<p>
+About a year ago, a friend and classmate of mine,
+<a href="https://elijahpotter.dev/">Elijah Potter</a>, created a
+spellchecking software for developers called Harper, and it quickly became a
+part of our friend group's development environments. I enjoyed using the tool,
+and since it had become a core part of my writing and development environments,
+I became invested in making it better. In September of this year, I started
+contributing to
+<a href="https://github.com/Automattic/harper">the project on GitHub</a>,
+and&ndash;after some smaller changes to familiarize myself with the project
+&ndash;chose to take on a rather large ticket to improve performance of the
+project's spellchecking component. The end result was an approximately 90%
+improvement in uncached spellchecking speed.
+</p>
+<h2>Original Implementation</h2>
+<hr />
+<p>
+Spellchecking in Harper is rather simple: words are compared to the dictionary.
+Those not in the dictionary are fuzzy-found on the dictionary, possible matches
+ranked, and the top three returned to the user as suggested edits.
+</p>
+<p>
+The fuzzy-finding is based on Levenshtein edit distance, which is the number of
+character changes from an existing word in the dictionary needed to transform to
+the misspelled word. This is rather costly to run on every word in the
+dictionary, so we want to reduce the words we actually run it over. Pruning is
+reducing the number of available options through rougher, yet faster, methods in
+order to reduce the edit distances we need to calculate.
+</p>
+<p>
+In the original implementation, this was accomplished by only considering words
+of a length allowed by the edit distance. So, for instance, if the maximum
+acceptable edit distance is 3, and the misspelled word was 6 characters long,
+only words of lengths 3&ndash;9 characters were considered. The edits required to
+reach these lengths would be removing or adding three characters respectively.
+Any longer or shorter, and the edit distance would be guaranteed to be over our
+threshold.
+</p>
+<p>
+To accomplish this pruning action, a words vector was built from Harper's
+curated dictionary, and sorted by length. An additional array (<tt>word_len_starts</tt>)
+stored the indexes at which the values in the words vector transitioned between
+word lengths. In order to prune the possible words, a slice over the words
+vector was taken using the transitional indexes for the appropriate word lengths
+indicated by <tt>word_len_starts</tt>.
+</p>
+<h3>Inefficiencies and Overhead</h3>
+<p>
+Once the words were pruned, the Levenshtein distance was calculated individually
+for each remaining word. A hash map was used to associate metadata with each
+word, accessed for every remaining word as a part of the result ranking process.
+</p>
+<p>
+There are some pretty clear issues with this implementation. Because of the way
+words were stored, the Levenshtein distance is calculated individually, which is
+suboptimal. The metadata hash map also isn’t ideal, since the overhead from the
+hash map is slower than just associating metadata by storing a pair of the word
+and metadata in the <tt>words</tt> vector.
+</p>
+<h2>FST-Based Implementation</h2>
+<hr />
+<p>
+The new implementation for Spellchecking is faster for several reasons, but is
+limited by the underlying data structures. Because of this, it isn’t ideal for
+all cases of spellchecking in Harper. For instance, the dictionary needs all
+words to be inserted in lexicographical order, which means it can’t be mutable.
+Additionally, there is a fairly significant overhead associated with
+constructing one. This isn’t particularly significant at startup, as some delay
+is expected, but it would slow use down significantly in cases where the
+dictionary changes at runtime.
+</p>
+<p>
+Harper’s spellchecking is done over a combination of four dictionaries: the
+Curated Dictionary, User Dictionary, File Dictionary, and Identifier Dictionary.
+Of these, only the Curated Dictionary is particularly suitable for the new
+implementation due to the aforementioned mutability restriction. Dictionaries
+that can be updated at runtime need to be reconstructed from scratch, and
+because of the overhead associated with reconstructing the dictionary, the
+performance gains are outweighed by the costs. Thankfully, searches in the
+Curated Dictionary make up almost all the runtime of spellchecking, so
+improvements are strongly reflected in the tool as a whole.
+</p>
+<p>
+Those that require runtime mutability, thankfully are extremely short in
+comparison to the Curated Dictionary. As such, the old implementation&mdash;
+called the <tt>FullDictionary</tt> implementation&mdash;is more appropriate, and
+so is used here. Using multiple implementations is made possible via the use of
+a <tt>MergedDictionary</tt>, which wraps several dictionaries and merges the
+outputs of each method across each of its &ldquo;children&rdquo;. Because of
+this, we can merge mutable and immutable dictionaries of multiple types, making
+it possible to use the appropriate spellchecking implementation for each
+use-case (via dictionary type) across Harper.
+</p>
+<h2>DFA Dictionaries and Levenshtein Automata</h2>
+<hr />
+<p>
+The new implementation uses the <a href="https://github.com/BurntSushi/fst">FST crate</a>
+to store the dictionary in an implementation of a Deterministic Finite Automata
+(DFA). The DFA stores words in a similar manner to a trie, but with combined
+suffixes as well as prefixes. The accepting states for this automata are the
+states immediately following the transition representing the final letter in
+each word, indicated below by double circles.
+</p>
+<p>
+Similarly, the Levenshtein automata can be built into a DFA accepting all words
+within a given edit distance of the misspelled word. These automata are complex,
+even with small acceptable edit distances, but it is rather easy to calculate
+the intersection of two DFA through the product construction. Accepting states
+in the intersection automata are those that are accepting in both the dictionary
+DFA and the generated DFA for the Levenshtein Automata.
+</p>
+<p>
+[<a href="https://youtu.be/CWei4YjTj90">Example of Product Construction</a>]
+[<a href="https://courses.grainger.illinois.edu/cs373/sp2010/lectures/lect_04.pdf">Formal Product Construction</a>]
+</p>
+<f>
+<img src="https://blog.burntsushi.net/images/transducers/sets/days3.png" class="noindent" alt="Example of words stored in a DFA, the stored strings are &ldquo;mon&rdquo;, &ldquo;tues&rdquo;, and &ldquo;thurs&rdquo;. Credit to Andrew Gallant.">
+<figcaption aria-hidden="true">Example of words stored in a DFA, the stored strings are &ldquo;mon&rdquo;, &ldquo;tues&rdquo;, and &ldquo;thurs&rdquo;. Credit to Andrew Gallant.</figcaption>
+</f>
+<p>
+</p>
